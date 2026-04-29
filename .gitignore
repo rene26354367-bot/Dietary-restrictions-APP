@@ -1,0 +1,9 @@
+node_modules/
+APP_UI_草稿/node_modules/
+user_data.json
+*.backup.*
+.DS_Store
+dist/
+.env
+.env.local
+.env.*.local

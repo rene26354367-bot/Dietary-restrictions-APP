@@ -1,0 +1,34 @@
+# 飲食營養 APP 專案 - 變更日誌 (CHANGELOG)
+
+## [v2.2] - 2026-04-27 (本次更新)
+### Added (新增)
+- 建立 `NutritionParser.js`：具備智慧解析 OCR 文字能力，支援「每一份量」與「每100g」基準自動換算。
+- 建立 `expand_db_v2.js`：實作資料去重匯入邏輯，成功加入連鎖速食與手搖飲數據。
+- 建立 `CHANGELOG.md`：專案主日誌，用於追蹤重大決策與版本更動。
+
+### Changed (變更)
+- **地基安全**：執行大規模匯入前建立 `core_nutrition_db.backup.v2.json` 備份。
+
+## [v2.1] - 2026-04-27
+### Changed (變更)
+- **資料規格升級**：資料庫遷移至 2.0 格式，支援 `brand`, `source`, `verified`, `barcode` 欄位。
+- **搜尋引擎強化**：`AppEngine.js` 加入 `smartSearch` 與品牌 Fallback 建議邏輯。
+- **外食匯入**：首批台灣超商健身食品數據匯入。
+
+## [v2.0] - 2026-04-27
+### Added (新增)
+- 建立 `AppEngine.js` 強化版：支援多日紀錄、體態追蹤（身高/體重/體脂/BMI）以及智慧份量轉換。
+- 建立 `StorageManager.js`：實作資料持久化，自動讀寫 `user_data.json`。
+
+## [v1.0] - 初始化階段
+### Added (新增)
+- 專案結構初始化，配置多代理協作環境。
+- 建立核心計算邏輯 `calculator.js` (BMI/TDEE 計算)。
+- 建立基礎食品資料庫 `core_nutrition_db.json` (2180 筆官方資料)。
+
+---
+**決策紀錄 (Key Decisions):**
+1. **1g 基準原則**: 所有資料統一以 1g 為儲存基準，確保換算精度。
+2. **人性化份量**: 根據性別預設「一碗/一份」的克數係數，提升用戶體驗。
+3. **體驗優先 OCR**: 初期策略採用 Cloud Vision API 以確保精準度，同時預留 On-device OCR 擴充空間。
+4. **零成本營運**: 優先選擇開源 API (Open Food Facts) 與本地運行邏輯，避免失控的雲端費用。

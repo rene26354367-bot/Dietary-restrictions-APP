@@ -1,0 +1,6 @@
+{
+  "name": "Daily Diet Tracker",
+  "description": "A daily diet tracking application with calculated nutritional targets and food database, supporting custom nutrition labels.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

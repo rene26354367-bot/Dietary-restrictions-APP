@@ -1,0 +1,14 @@
+{
+  "name": "nutrition-app",
+  "version": "1.0.0",
+  "description": "飲食營養 APP 專案",
+  "main": "calculator.js",
+  "scripts": {
+    "convert-db": "node 食品營養/convert_db.js",
+    "convert-db-categorized": "node 食品營養/已分類食材資料/convert_db.js",
+    "test-calc": "node calculator.js"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  }
+}

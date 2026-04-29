@@ -1,0 +1,43 @@
+{
+  "description": "台灣國健署 (HPA) 國人膳食營養素攝取量 (DRIs) 第八版標準",
+  "version": "8.0",
+  "ideal_bmi": 22,
+  "bmi_categories": {
+    "underweight": { "max": 18.5, "label": "體重過輕" },
+    "normal": { "min": 18.5, "max": 24, "label": "正常範圍" },
+    "overweight": { "min": 24, "max": 27, "label": "過重" },
+    "obese": { "min": 27, "label": "肥胖" }
+  },
+  "calorie_factors": {
+    "underweight": {
+      "low": 35,
+      "moderate": 40,
+      "high": 45
+    },
+    "normal": {
+      "low": 30,
+      "moderate": 35,
+      "high": 40
+    },
+    "overweight": {
+      "low": 25,
+      "moderate": 30,
+      "high": 35
+    },
+    "obese": {
+      "low": 20,
+      "moderate": 25,
+      "high": 30
+    }
+  },
+  "protein_rda_factors": [
+    { "min_age": 1, "max_age": 18, "factor": 1.1 },
+    { "min_age": 19, "max_age": 70, "factor": 1.1 },
+    { "min_age": 71, "max_age": 150, "factor": 1.2 }
+  ],
+  "amdr_ratios": {
+    "carbohydrate": { "min": 0.50, "max": 0.60, "default": 0.55 },
+    "protein": { "min": 0.10, "max": 0.20, "default": 0.15 },
+    "fat": { "min": 0.20, "max": 0.30, "default": 0.30 }
+  }
+}
