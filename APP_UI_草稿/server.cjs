@@ -145,6 +145,35 @@ app.get('/api/search', (req, res) => {
 });
 
 
+// 4. OCR 智慧解析 API
+app.post('/api/ocr-parse', (req, res) => {
+    const { text } = req.body;
+    if (!text) return res.status(400).json({ error: "請提供要解析的文字" });
+
+    try {
+        const NutritionParser = require('../NutritionParser');
+        const result = NutritionParser.parse(text);
+        
+        // 轉換為 UI 友善格式 (100g 基準)
+        const multiplier = 100;
+        const uiData = {
+            baseAmount: 100,
+            calories: (result.data.calories * multiplier).toFixed(1),
+            protein: (result.data.protein * multiplier).toFixed(1),
+            carbs: (result.data.carbohydrate * multiplier).toFixed(1),
+            fat: (result.data.fat * multiplier).toFixed(1),
+            sugar: (result.data.sugar * multiplier).toFixed(1),
+            sodium: (result.data.sodium * multiplier).toFixed(1),
+            parsedFrom: result.parsedFrom
+        };
+        
+        res.json(uiData);
+    } catch (e) {
+        console.error("OCR 解析失敗:", e);
+        res.status(500).json({ error: "解析失敗，請手動輸入" });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Backend API Server running at http://localhost:${PORT}`);
 });

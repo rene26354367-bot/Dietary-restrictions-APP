@@ -243,6 +243,9 @@ function CustomLabel({ onAdd }: { onAdd: () => void }) {
   const { addEntry, addCustomFood, currentDate } = useDiet();
   const [mealType, setMealType] = useState<string>('breakfast');
   const [entryDate, setEntryDate] = useState<string>(currentDate);
+  const [ocrText, setOcrText] = useState('');
+  const [isParsing, setIsParsing] = useState(false);
+  
   const [form, setForm] = useState({
     name: '',
     baseAmount: 100, // 標籤上一份的克數，通常是100或一份的重量
@@ -252,6 +255,34 @@ function CustomLabel({ onAdd }: { onAdd: () => void }) {
     fat: '',
     amountEaten: 100,
   });
+
+  const handleSmartParse = async () => {
+    if (!ocrText.trim()) return;
+    setIsParsing(true);
+    try {
+      const res = await fetch('http://localhost:3001/api/ocr-parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: ocrText })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      
+      setForm({
+        ...form,
+        baseAmount: data.baseAmount,
+        calories: data.calories,
+        carbs: data.carbs,
+        protein: data.protein,
+        fat: data.fat
+      });
+      alert(`解析成功！(基準：${data.parsedFrom})`);
+    } catch (e: any) {
+      alert("解析失敗：" + e.message);
+    } finally {
+      setIsParsing(false);
+    }
+  };
 
   const handleSaveToDatabase = () => {
     if (!form.name || !form.calories) return;
@@ -284,6 +315,32 @@ function CustomLabel({ onAdd }: { onAdd: () => void }) {
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+      {/* Smart OCR Paste Area */}
+      <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 space-y-3">
+        <div className="flex justify-between items-center">
+          <label className="text-sm font-bold text-blue-800 flex items-center gap-2">
+            <ScanBarcode className="w-4 h-4" /> 智慧標籤解析 (Beta)
+          </label>
+          <span className="text-[10px] bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full font-bold">實驗性功能</span>
+        </div>
+        <p className="text-xs text-blue-600/80 leading-relaxed">
+          請貼上標籤文字（例如：熱量 200kcal 蛋白質 10g...），系統將自動填入下方欄位。
+        </p>
+        <textarea
+          value={ocrText}
+          onChange={e => setOcrText(e.target.value)}
+          placeholder="在此貼上標籤內容..."
+          className="w-full h-24 p-3 text-xs bg-white border border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+        />
+        <button 
+          onClick={handleSmartParse}
+          disabled={isParsing || !ocrText.trim()}
+          className="w-full py-2 bg-blue-600 text-white text-sm font-bold rounded-xl shadow-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
+          {isParsing ? "正在辨識中..." : "一鍵自動填表"}
+        </button>
+      </div>
+
       <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 space-y-4">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">食物名稱</label>
