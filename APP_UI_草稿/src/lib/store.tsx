@@ -151,15 +151,16 @@ export const DietProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const removeEntry = (id: string) => {
+  const removeEntry = (id: string, targetDate?: string) => {
+    const logDate = targetDate || currentDate;
     setDailyLogs(prev => {
-      const todayLog = prev[currentDate];
-      if (!todayLog) return prev;
+      const dayLog = prev[logDate];
+      if (!dayLog) return prev;
       return {
         ...prev,
-        [currentDate]: {
-          ...todayLog,
-          entries: todayLog.entries.filter(e => e.id !== id)
+        [logDate]: {
+          ...dayLog,
+          entries: dayLog.entries.filter(e => e.id !== id)
         }
       };
     });

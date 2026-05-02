@@ -108,209 +108,219 @@ export default function NutritionStats() {
   }, [dailyLogs, bodyLogs, currentDate, timeRange, customStart, customEnd]);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-        <div>
-          <h2 className="text-xl font-bold text-slate-800">趨勢統計分析</h2>
-          <p className="text-sm text-slate-500">同步追蹤飲食與體重變化</p>
-        </div>
+    <div className="h-full flex flex-col -m-4 bg-slate-100">
+      {/* 頂部固定區：標題 */}
+      <div className="bg-white px-6 py-6 shadow-sm z-20 sticky top-0 border-b border-slate-100">
+        <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none">
+          趨勢統計
+        </h1>
+        <p className="text-xs font-bold text-slate-400 mt-2 flex items-center gap-1 uppercase tracking-wider">
+          <TrendingUp className="w-3 h-3" /> 飲食與體重連動分析
+        </p>
       </div>
 
-      {/* Summary Cards: Macro Split & Average */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex items-center gap-4">
-          <div className="w-24 h-24 flex-shrink-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={macroSummary}
-                  innerRadius={25}
-                  outerRadius={40}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {macroSummary.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={MACRO_COLORS[index % MACRO_COLORS.length]} />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
+      <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-20">
+        {/* Summary Cards: Macro Split & Average */}
+        <div className="grid grid-cols-1 gap-4">
+          <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex items-center justify-between">
+            <div className="w-32 h-32 flex-shrink-0 -ml-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={macroSummary.length > 0 ? macroSummary : [{ name: '無數據', value: 1 }]}
+                    innerRadius={28}
+                    outerRadius={42}
+                    paddingAngle={5}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {macroSummary.length > 0 ? macroSummary.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={MACRO_COLORS[index % MACRO_COLORS.length]} />
+                    )) : <Cell fill="#f1f5f9" />}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex-1 ml-2">
+              <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1">
+                <PieIcon className="w-3.5 h-3.5" /> 總攝取佔比
+              </h3>
+              <div className="space-y-2">
+                {macroSummary.length > 0 ? macroSummary.map((m, i) => {
+                  const total = macroSummary.reduce((s, x) => s + x.value, 0);
+                  const percent = total > 0 ? Math.round((m.value / total) * 100) : 0;
+                  return (
+                    <div key={m.name} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: MACRO_COLORS[i] }}></div>
+                        <span className="text-xs font-bold text-slate-600">{m.name}</span>
+                      </div>
+                      <span className="text-xs text-slate-400 font-mono font-bold">{percent}%</span>
+                    </div>
+                  );
+                }) : <p className="text-xs text-slate-300 italic">尚未有足夠數據</p>}
+              </div>
+            </div>
           </div>
-          <div>
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1">
-              <PieIcon className="w-3 h-3" /> 期間熱量佔比
+
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1">
+              <TrendingUp className="w-3.5 h-3.5 text-blue-500" /> 週期平均攝取
             </h3>
-            <div className="space-y-1">
-              {macroSummary.map((m, i) => {
-                const total = macroSummary.reduce((s, x) => s + x.value, 0);
-                const percent = total > 0 ? Math.round((m.value / total) * 100) : 0;
+            <p className="text-4xl font-black text-slate-800 leading-none">
+              {chartData.length > 0 ? chartData[chartData.length - 1].avgCalories || 0 : 0} 
+              <span className="text-sm font-bold text-slate-300 ml-2 italic">kcal/day</span>
+            </p>
+            <div className="mt-4 flex items-center gap-2">
+              <span className={cn("text-[10px] font-black px-2 py-1 rounded-lg", 
+                (chartData[chartData.length-1]?.avgCalories || 0) > (targets?.summary.targetCalories || 0) 
+                ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600"
+              )}>
+                {(chartData[chartData.length-1]?.avgCalories || 0) > (targets?.summary.targetCalories || 0) ? '⚠ 稍高於目標' : '✓ 控制良好'}
+              </span>
+              <span className="text-[10px] text-slate-400 font-medium">目標 {targets?.summary.targetCalories} kcal</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Controls */}
+        <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 space-y-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+              <Calendar className="w-4 h-4" /> 分析區間
+            </div>
+            <div className="flex bg-slate-100 p-1 rounded-xl">
+              {['7days', '30days', 'custom'].map(r => (
+                 <button
+                  key={r}
+                  onClick={() => setTimeRange(r as TimeRange)}
+                  className={cn("px-4 py-2 text-xs font-bold rounded-lg transition-all", timeRange === r ? "bg-white text-blue-600 shadow-sm" : "text-slate-400 hover:text-slate-600")}
+                 >
+                  {r === '7days' ? '7日' : r === '30days' ? '30日' : '自訂'}
+                 </button>
+              ))}
+            </div>
+          </div>
+
+          {timeRange === 'custom' && (
+            <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-100 animate-in slide-in-from-top-1">
+              <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="bg-white border text-slate-700 border-slate-200 rounded-xl px-3 py-2 text-xs flex-1" />
+              <span className="text-slate-300 text-xs font-bold">~</span>
+              <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="bg-white border text-slate-700 border-slate-200 rounded-xl px-3 py-2 text-xs flex-1" />
+            </div>
+          )}
+
+          <div className="border-t border-slate-50 pt-4">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">
+              <Filter className="w-4 h-4" /> 篩選維度
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {(Object.keys(metricConfig) as MetricType[]).map(metric => {
+                const config = metricConfig[metric];
+                const isActive = activeMetrics.includes(metric);
                 return (
-                  <div key={m.name} className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: MACRO_COLORS[i] }}></div>
-                    <span className="text-[10px] font-bold text-slate-600 w-10">{m.name}</span>
-                    <span className="text-[10px] text-slate-400 font-mono">{percent}%</span>
-                  </div>
+                  <button
+                    key={metric}
+                    onClick={() => toggleMetric(metric)}
+                    className={cn("px-3 py-2 rounded-xl text-[10px] font-black transition-all border", isActive ? "" : "bg-white border-slate-200 text-slate-300")}
+                    style={isActive ? { color: config.color, borderColor: config.color, backgroundColor: `${config.color}10` } : undefined}
+                  >
+                    {config.label}
+                  </button>
                 );
               })}
             </div>
           </div>
         </div>
 
+        {/* Main Chart */}
         <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1">
-            <TrendingUp className="w-3 h-3" /> 7日平均攝取
-          </h3>
-          <p className="text-3xl font-black text-slate-800 leading-none">
-            {chartData.length > 0 ? chartData[chartData.length - 1].avgCalories || 0 : 0} 
-            <span className="text-sm font-bold text-slate-400 ml-1">kcal</span>
-          </p>
-          <div className="mt-3 flex items-center gap-2">
-            <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded", 
-              (chartData[chartData.length-1]?.avgCalories || 0) > (targets?.summary.targetCalories || 0) 
-              ? "bg-rose-50 text-rose-500" : "bg-emerald-50 text-emerald-500"
-            )}>
-              {(chartData[chartData.length-1]?.avgCalories || 0) > (targets?.summary.targetCalories || 0) ? '高於目標' : '穩定控制'}
-            </span>
-            <span className="text-[10px] text-slate-400">vs 目標 {targets?.summary.targetCalories}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Controls */}
-      <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-            <Calendar className="w-4 h-4" /> 時間範圍
-          </div>
-          <div className="flex bg-slate-100 p-1 rounded-xl">
-            {['7days', '30days', 'custom'].map(r => (
-               <button
-                key={r}
-                onClick={() => setTimeRange(r as TimeRange)}
-                className={cn("px-3 py-1.5 text-xs font-medium rounded-lg transition-colors", timeRange === r ? "bg-white text-blue-600 shadow-sm" : "text-slate-500")}
-               >
-                {r === '7days' ? '近 7 天' : r === '30days' ? '近 30 天' : '自訂'}
-               </button>
-            ))}
+          <div className="h-72 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f8fafc" />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#cbd5e1', fontSize: 10, fontWeight: 700 }} dy={10} />
+                <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: '#cbd5e1', fontSize: 10, fontWeight: 700 }} hide={!activeMetrics.some(m => m.includes('calories'))} />
+                <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fill: '#cbd5e1', fontSize: 10, fontWeight: 700 }} hide={!activeMetrics.some(m => ['protein', 'carbs', 'fat', 'weight'].includes(m))} />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', padding: '12px 16px' }}
+                  itemStyle={{ fontWeight: 800, fontSize: '12px' }}
+                />
+                
+                {activeMetrics.map(metric => (
+                  <Line 
+                    key={metric}
+                    yAxisId={metric.includes('calories') ? 'left' : 'right'}
+                    type="monotone" 
+                    dataKey={metric} 
+                    name={metricConfig[metric].label}
+                    stroke={metricConfig[metric].color} 
+                    strokeWidth={metric === 'avgCalories' ? 2 : 4}
+                    strokeDasharray={metric === 'avgCalories' ? "6 6" : "0"}
+                    dot={metric === 'avgCalories' ? false : { r: 4, strokeWidth: 3, fill: '#fff', stroke: metricConfig[metric].color }}
+                    connectNulls={metric === 'weight'}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
-        {timeRange === 'custom' && (
-          <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
-            <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="bg-white border text-slate-700 border-slate-200 rounded-lg px-2 py-1 text-sm flex-1 w-full" />
-            <span className="text-slate-400 text-sm font-medium">至</span>
-            <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="bg-white border text-slate-700 border-slate-200 rounded-lg px-2 py-1 text-sm flex-1 w-full" />
+        {/* History Detail with Insights */}
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="p-5 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+            <h3 className="font-bold text-slate-800 text-sm">數據細節回顧</h3>
+            <Info className="w-4 h-4 text-slate-300" />
           </div>
-        )}
+          <div className="divide-y divide-slate-100 max-h-[500px] overflow-y-auto">
+            {chartData.slice().reverse().map(day => {
+              const targetCals = targets?.summary.targetCalories || 2000;
+              const diff = day.calories - targetCals;
+              const isLogged = day.calories > 0;
 
-        <div className="border-t border-slate-100 pt-4">
-          <div className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-3">
-            <Filter className="w-4 h-4" /> 顯示數據
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {(Object.keys(metricConfig) as MetricType[]).map(metric => {
-              const config = metricConfig[metric];
-              const isActive = activeMetrics.includes(metric);
               return (
-                <button
-                  key={metric}
-                  onClick={() => toggleMetric(metric)}
-                  className={cn("px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all border", isActive ? "bg-slate-50" : "bg-white border-slate-200 text-slate-400")}
-                  style={isActive ? { color: config.color, borderColor: config.color, backgroundColor: `${config.color}10` } : undefined}
-                >
-                  {config.label}
-                </button>
+                <div key={day.dateFull} className="p-5 hover:bg-slate-50 transition-colors">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <p className="font-black text-slate-800 text-base">{day.date}</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{day.dateFull}</p>
+                    </div>
+                    {isLogged && (
+                      <div className={cn("px-3 py-1 rounded-xl text-[10px] font-black", 
+                        Math.abs(diff) < 100 ? "bg-emerald-100 text-emerald-600" : 
+                        diff > 0 ? "bg-rose-100 text-rose-600" : "bg-blue-100 text-blue-600"
+                      )}>
+                        {Math.abs(diff) < 100 ? '達標 ✓' : diff > 0 ? `+${diff} kcal` : `${diff} kcal`}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {isLogged ? (
+                    <div className="grid grid-cols-4 gap-4">
+                      <div className="space-y-1">
+                        <p className="text-[8px] text-slate-300 uppercase font-black">熱量</p>
+                        <p className="text-sm font-black text-slate-700">{day.calories}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[8px] text-amber-400 uppercase font-black">碳水</p>
+                        <p className="text-sm font-black text-slate-700">{day.carbs}g</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[8px] text-rose-400 uppercase font-black">蛋白</p>
+                        <p className="text-sm font-black text-slate-700">{day.protein}g</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[8px] text-emerald-400 uppercase font-black">體重</p>
+                        <p className="text-sm font-black text-slate-700">{day.weight || '--'}kg</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-300 italic font-medium">尚無攝取紀錄</p>
+                  )}
+                </div>
               );
             })}
           </div>
-        </div>
-      </div>
-
-      {/* Main Chart */}
-      <div className="bg-white p-4 sm:p-6 rounded-3xl shadow-sm border border-slate-100">
-        <div className="h-72 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} dy={10} />
-              <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} hide={!activeMetrics.some(m => m.includes('calories'))} />
-              <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} hide={!activeMetrics.some(m => ['protein', 'carbs', 'fat', 'weight'].includes(m))} />
-              <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-              
-              {activeMetrics.map(metric => (
-                <Line 
-                  key={metric}
-                  yAxisId={metric.includes('calories') ? 'left' : 'right'}
-                  type="monotone" 
-                  dataKey={metric} 
-                  name={metricConfig[metric].label}
-                  stroke={metricConfig[metric].color} 
-                  strokeWidth={metric === 'avgCalories' ? 2 : 3}
-                  strokeDasharray={metric === 'avgCalories' ? "5 5" : "0"}
-                  dot={metric === 'avgCalories' ? false : { r: 3, strokeWidth: 2, fill: '#fff', stroke: metricConfig[metric].color }}
-                  connectNulls={metric === 'weight'}
-                />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* History Detail with Insights */}
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-          <h3 className="font-bold text-slate-800 text-sm">歷史趨勢分析</h3>
-          <Info className="w-4 h-4 text-slate-300" />
-        </div>
-        <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto">
-          {chartData.slice().reverse().map(day => {
-            const targetCals = targets?.summary.targetCalories || 2000;
-            const diff = day.calories - targetCals;
-            const isLogged = day.calories > 0;
-
-            return (
-              <div key={day.dateFull} className="p-4 hover:bg-slate-50 transition-colors">
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <p className="font-black text-slate-800">{day.date}</p>
-                    <p className="text-[10px] text-slate-400 font-medium">{day.dateFull}</p>
-                  </div>
-                  {isLogged && (
-                    <div className={cn("px-2 py-1 rounded-lg text-[10px] font-bold", 
-                      Math.abs(diff) < 100 ? "bg-emerald-100 text-emerald-600" : 
-                      diff > 0 ? "bg-rose-100 text-rose-600" : "bg-blue-100 text-blue-600"
-                    )}>
-                      {Math.abs(diff) < 100 ? '精準達標' : diff > 0 ? `超標 ${diff}` : `剩餘 ${Math.abs(diff)}`} kcal
-                    </div>
-                  )}
-                </div>
-                
-                {isLogged ? (
-                  <div className="grid grid-cols-4 gap-2">
-                    <div className="space-y-1">
-                      <p className="text-[8px] text-slate-400 uppercase font-bold">總熱量</p>
-                      <p className="text-sm font-black text-slate-700">{day.calories}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[8px] text-amber-500 uppercase font-bold">碳水</p>
-                      <p className="text-sm font-bold text-slate-600">{day.carbs}g</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[8px] text-rose-500 uppercase font-bold">蛋白</p>
-                      <p className="text-sm font-bold text-slate-600">{day.protein}g</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[8px] text-emerald-500 uppercase font-bold">體重</p>
-                      <p className="text-sm font-bold text-slate-600">{day.weight || '--'}kg</p>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-300 italic">當日無飲食紀錄</p>
-                )}
-              </div>
-            );
-          })}
         </div>
       </div>
     </div>

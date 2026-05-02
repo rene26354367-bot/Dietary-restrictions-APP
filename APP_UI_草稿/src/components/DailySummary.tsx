@@ -1,16 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDiet } from '../lib/store';
 import { CircularProgressbar, buildStyles } from 'react-circular-progressbar';
 import 'react-circular-progressbar/dist/styles.css';
-import { Flame, Droplets, Wheat, Utensils } from 'lucide-react';
+import { Flame, Droplets, Wheat, Utensils, Info, Lightbulb, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { format, parseISO } from 'date-fns';
 
 export default function DailySummary() {
   const { targets, dailyLogs, currentDate, setDate, removeEntry, updateEntry } = useDiet();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [advice, setAdvice] = useState<any[]>([]);
+
+  // 取得智慧建議
+  useEffect(() => {
+    fetch(`http://localhost:3001/api/advice?date=${currentDate}`)
+      .then(res => res.json())
+      .then(data => setAdvice(data))
+      .catch(err => console.error("Failed to fetch advice", err));
+  }, [currentDate, dailyLogs]); // 當日期或紀錄變動時重新取得建議
 
   if (!targets) return null;
+// ... rest of logic
   
   const isToday = currentDate === format(new Date(), 'yyyy-MM-dd');
 
@@ -110,6 +120,40 @@ export default function DailySummary() {
           />
         </div>
       </div>
+
+      {/* 智慧建議與分析 */}
+      {advice.length > 0 && (
+        <div className="px-4 mt-6">
+          <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center">
+                <Lightbulb className="w-4 h-4 text-blue-500" />
+              </div>
+              <h3 className="font-bold text-slate-800 text-sm">智慧分析建議</h3>
+            </div>
+            <div className="space-y-3">
+              {advice.map((item, i) => (
+                <div 
+                  key={i} 
+                  className={cn(
+                    "p-3 rounded-2xl flex items-start gap-3 transition-all animate-in fade-in slide-in-from-left-2",
+                    item.type === 'success' ? "bg-emerald-50 text-emerald-700 border border-emerald-100" :
+                    item.type === 'warning' ? "bg-amber-50 text-amber-700 border border-amber-100" :
+                    item.type === 'danger' ? "bg-rose-50 text-rose-700 border border-rose-100" :
+                    "bg-blue-50 text-blue-700 border border-blue-100"
+                  )}
+                >
+                  {item.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" /> :
+                   item.type === 'warning' ? <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> :
+                   item.type === 'danger' ? <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> :
+                   <Info className="w-4 h-4 shrink-0 mt-0.5" />}
+                  <p className="text-xs font-medium leading-relaxed">{item.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 飲食紀錄滾動區 */}
       <div className="flex-1 overflow-y-auto px-4 py-6">

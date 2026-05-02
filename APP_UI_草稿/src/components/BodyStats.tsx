@@ -1,47 +1,61 @@
 import React, { useState, useMemo } from 'react';
-import { useDiet } from '../lib/store';
+import { useDiet, BodyLog } from '../lib/store';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
-import { Activity, Weight, Calendar, Ruler, Percent } from 'lucide-react';
-import { format, parseISO, subDays, differenceInDays, startOfDay, isBefore } from 'date-fns';
+import { Activity, Weight, Calendar, Ruler, Percent, Edit, Trash2, ChevronRight, History } from 'lucide-react';
+import { format, parseISO, subDays, differenceInDays, startOfDay, isBefore, isValid } from 'date-fns';
 import { cn } from '../lib/utils';
 
 type BodyMetric = 'weight' | 'bmi' | 'bodyFat';
-type TimeRange = '7days' | '30days' | 'all';
 
-const metricConfig = {
-  weight: { label: '體重 (kg)', color: '#3b82f6', unit: 'kg' },
-  bmi: { label: 'BMI', color: '#8b5cf6', unit: '' },
-  bodyFat: { label: '體脂率 (%)', color: '#ec4899', unit: '%' }
+const metricConfig: Record<BodyMetric, { label: string; color: string; unit: string }> = {
+  weight:  { label: '體重 kg',  color: '#3b82f6', unit: 'kg' },
+  bmi:     { label: 'BMI 指數', color: '#8b5cf6', unit: '' },
+  bodyFat: { label: '體脂率 %', color: '#f43f5e', unit: '%' },
 };
 
 export default function BodyStats() {
   const { bodyLogs, userProfile, addBodyLog, currentDate } = useDiet();
 
-  // 輸入表單狀態
-  const [logDate, setLogDate] = useState(currentDate);
-  const [weight, setWeight] = useState(bodyLogs[currentDate]?.weight || userProfile?.weight || 70);
-  const [height, setHeight] = useState(bodyLogs[currentDate]?.height || userProfile?.height || 170);
-  const [bodyFat, setBodyFat] = useState<string>(bodyLogs[currentDate]?.bodyFat?.toString() || '');
-
-  // 圖表控制狀態
+  // ── 表單 State ───────────────────────────────────────────
+  const [logDate, setLogDate]           = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [height,  setHeight]            = useState<number>(userProfile?.height || 170);
+  const [weight,  setWeight]            = useState<number>(userProfile?.weight || 60);
+  const [bodyFat, setBodyFat]           = useState('');
+  const [isEditing, setIsEditing]       = useState(false);
+  const [timeRange,  setTimeRange]      = useState<'7days' | '30days' | 'all'>('30days');
   const [activeMetric, setActiveMetric] = useState<BodyMetric>('weight');
-  const [timeRange, setTimeRange] = useState<TimeRange>('7days');
 
-  const handleSave = () => {
-    addBodyLog(logDate, weight, height, bodyFat ? Number(bodyFat) : undefined);
-    alert(`已儲存 ${logDate} 的身體數據`);
-  };
-
-  // 根據日期切換自動填入當天現有數據
+  // ── Handlers ─────────────────────────────────────────────
   const handleDateChange = (date: string) => {
     setLogDate(date);
-    const existing = bodyLogs[date];
-    if (existing) {
-      setWeight(existing.weight);
-      setHeight(existing.height);
-      setBodyFat(existing.bodyFat?.toString() || '');
+    const log = bodyLogs[date];
+    if (log) {
+      setHeight(log.height || userProfile?.height || 170);
+      setWeight(log.weight || 0);
+      setBodyFat(log.bodyFat != null ? String(log.bodyFat) : '');
+      setIsEditing(true);
+    } else {
+      setIsEditing(false);
     }
   };
+
+  const handleSave = () => {
+    if (!weight || !height) return;
+    addBodyLog(logDate, weight, height, bodyFat ? parseFloat(bodyFat) : undefined);
+    setIsEditing(true);
+  };
+
+  const startEdit = (date: string) => {
+    handleDateChange(date);
+  };
+
+  // 歷史紀錄清單 (僅顯示有測量的天數，並加入日期合法性檢查防止崩潰)
+  const historyList = useMemo(() => {
+    if (!bodyLogs) return [];
+    return (Object.values(bodyLogs) as BodyLog[])
+      .filter(log => log && log.date && isValid(parseISO(log.date)))
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [bodyLogs]);
 
   // 整理圖表資料
   const chartData = useMemo(() => {
@@ -52,7 +66,6 @@ export default function BodyStats() {
     if (timeRange === '7days') start = subDays(end, 6);
     else if (timeRange === '30days') start = subDays(end, 29);
     else {
-      // "all" - 找到最早的一筆紀錄
       const dates = Object.keys(bodyLogs).sort();
       start = dates.length > 0 ? parseISO(dates[0]) : subDays(end, 6);
     }
@@ -157,8 +170,62 @@ export default function BodyStats() {
           onClick={handleSave}
           className="w-full mt-6 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-200 transition-all active:scale-95"
         >
-          儲存此日數據
+          {isEditing ? '更新測量數據' : '儲存此日數據'}
         </button>
+      </div>
+
+      {/* 歷史紀錄清單 */}
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="p-5 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+          <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
+            <History className="w-4 h-4 text-slate-400" /> 測量歷史紀錄
+          </h3>
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{historyList.length} 次測量</span>
+        </div>
+        
+        <div className="divide-y divide-slate-50">
+          {historyList.length > 0 ? historyList.map(log => {
+            const dateObj = parseISO(log.date);
+            const displayDate = isValid(dateObj) ? format(dateObj, 'MM/dd') : '??/??';
+            
+            return (
+              <div key={log.date} className="p-4 hover:bg-slate-50 transition-colors flex items-center justify-between group">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="font-black text-slate-800">{displayDate}</p>
+                    <p className="text-[10px] text-slate-400 font-bold">{log.date}</p>
+                  </div>
+                  <div className="flex gap-4">
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] font-black text-blue-500">WT</span>
+                      <span className="text-sm font-bold text-slate-600">{log.weight}kg</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] font-black text-indigo-500">BMI</span>
+                      <span className="text-sm font-bold text-slate-600">{log.bmi}</span>
+                    </div>
+                    {log.bodyFat && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] font-black text-rose-500">FAT</span>
+                        <span className="text-sm font-bold text-slate-600">{log.bodyFat}%</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <button 
+                  onClick={() => startEdit(log.date)}
+                  className="p-2.5 bg-slate-100 text-slate-400 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-all opacity-0 group-hover:opacity-100"
+                >
+                  <Edit className="w-4 h-4" />
+                </button>
+              </div>
+            );
+          }) : (
+            <div className="p-12 text-center">
+              <p className="text-sm text-slate-400 italic">尚無歷史測量紀錄</p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 圖表分析 */}

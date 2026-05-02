@@ -291,6 +291,49 @@ class AppEngine {
     }, { calories: 0, protein: 0, fat: 0, carbohydrate: 0, sugar: 0, sodium: 0 });
   }
 
+  getAdvice(dateStr) {
+    const total = this.getDailyTotal(dateStr);
+    const targets = this.dailyTarget;
+    if (!targets) return [];
+
+    const advice = [];
+    const calDiff = targets.summary.targetCalories - total.calories;
+
+    // 1. 熱量分析
+    if (total.calories === 0) {
+      advice.push({ type: 'info', text: '今天還沒有紀錄喔，開始記錄你的第一餐吧！' });
+    } else if (calDiff > 500) {
+      advice.push({ type: 'warning', text: `熱量缺口達 ${Math.round(calDiff)} kcal，建議適量補充避免基礎代謝下降。` });
+    } else if (calDiff < -200) {
+      advice.push({ type: 'danger', text: '今日攝取已超過目標，建議增加運動量或調整下一餐份量。' });
+    } else {
+      advice.push({ type: 'success', text: '熱量控制得非常完美，請繼續保持！' });
+    }
+
+    // 2. 蛋白質分析
+    const proteinTarget = targets.macros.protein.g;
+    const proteinGap = proteinTarget - total.protein;
+    if (total.calories > 0 && total.protein < proteinTarget * 0.7) {
+      advice.push({ type: 'warning', text: `蛋白質缺口較大 (${Math.round(proteinGap)}g)，建議晚餐補充雞胸肉、雞蛋或豆漿。` });
+    }
+
+    // 3. 鈉含量警告
+    if (total.sodium > 2300) {
+      advice.push({ type: 'danger', text: '今日鈉攝取量過高，請多喝水幫助代謝，並減少加工食品攝取。' });
+    }
+
+    // 4. 週趨勢提示 (簡化版)
+    const dates = Object.keys(this.dailyLogs).sort().reverse().slice(0, 7);
+    if (dates.length >= 3) {
+      const avgCals = dates.reduce((acc, d) => acc + this.getDailyTotal(d).calories, 0) / dates.length;
+      if (avgCals > targets.summary.targetCalories * 1.1) {
+        advice.push({ type: 'info', text: '近三日攝取持續偏高，建議檢視飲食清單中的加工食品比例。' });
+      }
+    }
+
+    return advice;
+  }
+
   saveData() {
     StorageManager.save({
       profile: this.userProfile,
