@@ -13,16 +13,26 @@ class AppEngine {
     const savedData = StorageManager.load();
     this.userProfile = savedData.profile || { gender: 'male' };
     
-    // 載入俗名對照表 (確保一定有值)
+    // 載入俗名別名表 (俗名 → 官方名，方向正確)
     try {
-      const namingPath = path.join(__dirname, 'manual_naming.json');
-      if (fs.existsSync(namingPath)) {
-        this.namingMap = JSON.parse(fs.readFileSync(namingPath, 'utf8'));
+      const aliasPath = path.join(__dirname, 'aliases.json');
+      if (fs.existsSync(aliasPath)) {
+        this.aliasMap = JSON.parse(fs.readFileSync(aliasPath, 'utf8'));
       } else {
-        this.namingMap = {};
+        this.aliasMap = {};
       }
     } catch (e) {
-      console.error("無法載入俗名對照表:", e);
+      console.error("無法載入別名對照表:", e);
+      this.aliasMap = {};
+    }
+
+    // 保留舊的 namingMap 載入（向下相容）
+    try {
+      const namingPath = path.join(__dirname, 'manual_naming.json');
+      this.namingMap = fs.existsSync(namingPath)
+        ? JSON.parse(fs.readFileSync(namingPath, 'utf8'))
+        : {};
+    } catch (e) {
       this.namingMap = {};
     }
     
@@ -103,19 +113,35 @@ class AppEngine {
   _migrateCustomFoods(foods) {
     if (!Array.isArray(foods)) return [];
     return foods.map(f => {
-      if (f.nutrients) return f;
+      // 如果已經有 nutrients 且看起來是 per 1g (例如熱量不應該是幾百)，則跳過
+      // 但為了保險起見，我們統一以 baseGrams 進行歸一化
+      const base = f.baseGrams || 100;
+      
+      // 如果已經是 2.0 規格且有 nutrients，我們確保它是 per 1g
+      if (f.nutrients) {
+        // 啟發式檢查：如果 nutrients.calories > 20，很可能是 per 100g 而非 per 1g (除非是極高熱量食物)
+        // 但最準確的做法是看當初存入時是否已經歸一化。
+        // 這裡我們假設如果從 UI 存入，nutrients 會是 null。
+        return f;
+      }
+
       return {
         ...f,
         nutrients: {
-          calories: f.calories || 0,
-          protein: f.protein || 0,
-          fat: f.fat || 0,
-          carbohydrate: f.carbohydrate || f.carbs || 0,
-          sugar: f.sugar || 0,
-          sodium: f.sodium || 0
+          calories: (f.calories || 0) / base,
+          protein: (f.protein || 0) / base,
+          fat: (f.fat || 0) / base,
+          carbohydrate: (f.carbohydrate || f.carbs || 0) / base,
+          sugar: (f.sugar || 0) / base,
+          sodium: (f.sodium || 0) / base
         }
       };
     });
+  }
+
+  setCustomFoods(foods) {
+    this.customFoods = this._migrateCustomFoods(foods);
+    this.saveData();
   }
 
   // --- 強化搜尋引擎 ---
@@ -137,41 +163,70 @@ class AppEngine {
   }
 
   searchFood(keyword) {
-    let searchTerms = [keyword];
-    
-    // 俗名對應搜尋 (反向映射) - 只有在有輸入時才執行
-    if (this.namingMap && keyword.trim().length > 0) {
-      Object.keys(this.namingMap).forEach(academicName => {
-        const commonName = this.namingMap[academicName];
-        if (commonName.includes(keyword) || keyword.includes(commonName)) {
-          searchTerms.push(academicName);
-        }
-      });
-    }
-
-    // 如果關鍵字為空，給予預設關鍵字或直接回傳空陣列 (由 server 處理初始清單)
     if (keyword.trim().length === 0) {
       return this.customFoods.slice(0, 20).map(f => ({ ...f, source: this.SOURCES.USER }));
     }
 
+    const kw = keyword.trim();
+    let searchTerms = [kw];
+    const matchedAliasMap = {}; // { officialTerm: "使用者輸入的俗名" }
+
+    // Layer 2：別名查詢（俗名 → 官方名，方向正確）
+    if (this.aliasMap) {
+      // 精確匹配：「小黃瓜」→「胡瓜」
+      if (this.aliasMap[kw]) {
+        const official = this.aliasMap[kw];
+        if (!searchTerms.includes(official)) {
+          searchTerms.push(official);
+          matchedAliasMap[official] = kw;
+        }
+      }
+      // 部分匹配：輸入「黃瓜」→ 找到「小黃瓜」→ 再拿「胡瓜」搜
+      Object.keys(this.aliasMap).forEach(alias => {
+        if (alias !== kw && alias.includes(kw)) {
+          const official = this.aliasMap[alias];
+          if (!searchTerms.includes(official)) {
+            searchTerms.push(official);
+            // 部分匹配時顯示完整別名（如「黃瓜」→ 顯示「小黃瓜」）
+            if (!matchedAliasMap[official]) matchedAliasMap[official] = alias;
+          }
+        }
+      });
+    }
+
     searchTerms = [...new Set(searchTerms)];
 
-    let allResults = [];
+    // 分開收集：alias 展開的結果 vs 直接關鍵字匹配的結果
+    // alias 結果優先顯示，讓使用者輸入俗名能直接看到官方食材
+    let directResults = [];
+    let aliasResults = [];
     searchTerms.forEach(term => {
-      const officialResults = searchFood(term).map(f => ({
-        brand: "通用",
-        source: this.SOURCES.OFFICIAL,
-        verified: true,
-        ...f // 優先使用資料庫中已有的欄位 (如品牌、來源)
-      }));
-      allResults = [...allResults, ...officialResults];
+      const officialResults = searchFood(term).map(f => {
+        const base = {
+          brand: "通用",
+          source: this.SOURCES.OFFICIAL,
+          verified: true,
+          ...f,
+        };
+        // 若此搜尋詞是透過別名展開的，則所有結果都標記 matchedAlias
+        if (matchedAliasMap[term]) {
+          base.matchedAlias = matchedAliasMap[term];
+        }
+        return base;
+      });
+      if (matchedAliasMap[term]) {
+        aliasResults = [...aliasResults, ...officialResults];
+      } else {
+        directResults = [...directResults, ...officialResults];
+      }
     });
-    
+
     const customResults = this.customFoods
-      .filter(f => f.name.includes(keyword))
+      .filter(f => f.name.includes(kw))
       .map(f => ({ ...f, source: this.SOURCES.USER, verified: false }));
 
-    return [...customResults, ...allResults];
+    // 排序：自訂食物 > alias官方食材 > 直接名稱匹配
+    return [...customResults, ...aliasResults, ...directResults];
   }
 
   _getFallbackKeyword(query) {

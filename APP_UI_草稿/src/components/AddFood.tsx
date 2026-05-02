@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useDiet } from '../lib/store';
-import { Search, ScanBarcode, ArrowLeft, CheckCircle2, BookmarkPlus } from 'lucide-react';
+import { Search, ScanBarcode, ArrowLeft, CheckCircle2, BookmarkPlus, Camera, Loader2, AlertTriangle, Info } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 
@@ -12,6 +12,7 @@ const MEAL_TYPES = [
   { id: 'dinner', label: '晚餐' },
   { id: 'supper', label: '消夜' }
 ];
+// ... rest of code (AddFood, PresetSearch)
 
 export default function AddFood() {
   const [tab, setTab] = useState<'preset' | 'custom'>('preset');
@@ -126,6 +127,9 @@ function PresetSearch({ onAdd }: { onAdd: () => void }) {
                     <span>{item.name}</span>
                     {item.detail && <span className="text-[10px] font-normal text-slate-400">({item.detail})</span>}
                   </p>
+                  {item.matchedAlias && (
+                    <p className="text-[11px] text-slate-400 mt-0.5">{item.matchedAlias}</p>
+                  )}
                   <span className="text-sm font-black text-blue-600">
                     {item.calories.toFixed(0)} <span className="text-[10px] font-medium text-slate-400">kcal</span>
                   </span>
@@ -245,40 +249,121 @@ function CustomLabel({ onAdd }: { onAdd: () => void }) {
   const [entryDate, setEntryDate] = useState<string>(currentDate);
   const [ocrText, setOcrText] = useState('');
   const [isParsing, setIsParsing] = useState(false);
+  const [metadata, setMetadata] = useState<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [form, setForm] = useState({
     name: '',
-    baseAmount: 100, // 標籤上一份的克數，通常是100或一份的重量
+    baseAmount: 100, 
     calories: '',
     carbs: '',
     protein: '',
     fat: '',
+    sugar: '',
+    sodium: '',
     amountEaten: 100,
   });
 
-  const handleSmartParse = async () => {
-    if (!ocrText.trim()) return;
+  const handleSmartParse = async (text: string = ocrText) => {
+    if (!text.trim()) return;
     setIsParsing(true);
+    setMetadata(null);
     try {
       const res = await fetch('http://localhost:3001/api/ocr-parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: ocrText })
+        body: JSON.stringify({ text })
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       
-      setForm({
-        ...form,
-        baseAmount: data.baseAmount,
-        calories: data.calories,
-        carbs: data.carbs,
-        protein: data.protein,
-        fat: data.fat
-      });
-      alert(`解析成功！(基準：${data.parsedFrom})`);
+      setForm(prev => ({
+        ...prev,
+        baseAmount: data.baseAmount || 100,
+        calories: data.calories || '',
+        carbs: data.carbs || '',
+        protein: data.protein || '',
+        fat: data.fat || '',
+        sugar: data.sugar || '',
+        sodium: data.sodium || ''
+      }));
+      setMetadata(data.metadata || null);
     } catch (e: any) {
       alert("解析失敗：" + e.message);
+    } finally {
+      setIsParsing(false);
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsParsing(true);
+    setMetadata(null);
+    try {
+      // 1. 判斷裝置性能與設定解析度上限
+      const isLowEnd = (navigator.hardwareConcurrency || 4) <= 4;
+      const MAX_EDGE = isLowEnd ? 1800 : 2400;
+
+      // 2. 使用 createImageBitmap 在後台解碼，避免主執行緒卡頓
+      const bitmap = await createImageBitmap(file);
+      let { width, height } = bitmap;
+
+      // 3. 計算縮放比例 (字體保護邏輯：不放大)
+      let scale = 1;
+      if (width > MAX_EDGE || height > MAX_EDGE) {
+        scale = Math.min(MAX_EDGE / width, MAX_EDGE / height);
+      }
+
+      // 4. 準備 Canvas 進行高品質處理
+      const canvas = document.createElement('canvas');
+      canvas.width = width * scale;
+      canvas.height = height * scale;
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) throw new Error('Canvas context unavailable');
+
+      // 設定高品質重採樣
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      // 自適應對比強化 (非強制灰階，保留顏色資訊)
+      ctx.filter = 'contrast(1.15) brightness(1.03)';
+
+      // 5. 繪製並進行處理
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close(); // 釋放記憶體
+
+      // 6. 導出高品質 JPEG (0.85)
+      const base64Image = canvas.toDataURL('image/jpeg', 0.85);
+
+      const res = await fetch('http://localhost:3001/api/ocr-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64Image })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      setForm(prev => ({
+        ...prev,
+        baseAmount: Number(data.baseAmount) || 100,
+        calories: data.calories || '',
+        carbs: data.carbs || '',
+        protein: data.protein || '',
+        fat: data.fat || '',
+        sugar: data.sugar || '',
+        sodium: data.sodium || ''
+      }));
+      setMetadata(data.metadata || null);
+
+      if (!data.calories && !data.protein) {
+        alert("文字已辨識，但無法自動提取數值，請手動校對或重新拍攝清晰的標籤。");
+      }
+    } catch (e: any) {
+       console.error("[Pipeline Error]", e);
+       alert("影像處理或辨識發生錯誤，請重試。");
     } finally {
       setIsParsing(false);
     }
@@ -293,6 +378,8 @@ function CustomLabel({ onAdd }: { onAdd: () => void }) {
       protein: Number(form.protein || 0),
       carbs: Number(form.carbs || 0),
       fat: Number(form.fat || 0),
+      sugar: Number(form.sugar || 0),
+      sodium: Number(form.sodium || 0),
       unit: `${form.baseAmount}g`,
     });
     alert('已儲存至搜尋食材庫');
@@ -308,6 +395,8 @@ function CustomLabel({ onAdd }: { onAdd: () => void }) {
       protein: Number(form.protein || 0) * ratio,
       carbs: Number(form.carbs || 0) * ratio,
       fat: Number(form.fat || 0) * ratio,
+      sugar: Number(form.sugar || 0) * ratio,
+      sodium: Number(form.sodium || 0) * ratio,
       mealType,
     }, entryDate);
     onAdd();
@@ -316,30 +405,96 @@ function CustomLabel({ onAdd }: { onAdd: () => void }) {
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
       {/* Smart OCR Paste Area */}
-      <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 space-y-3">
+      <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 space-y-4">
         <div className="flex justify-between items-center">
           <label className="text-sm font-bold text-blue-800 flex items-center gap-2">
-            <ScanBarcode className="w-4 h-4" /> 智慧標籤解析 (Beta)
+            <ScanBarcode className="w-4 h-4" /> 智慧標籤辨識
           </label>
-          <span className="text-[10px] bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full font-bold">實驗性功能</span>
+          <span className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold">Cloud Vision</span>
         </div>
-        <p className="text-xs text-blue-600/80 leading-relaxed">
-          請貼上標籤文字（例如：熱量 200kcal 蛋白質 10g...），系統將自動填入下方欄位。
-        </p>
-        <textarea
-          value={ocrText}
-          onChange={e => setOcrText(e.target.value)}
-          placeholder="在此貼上標籤內容..."
-          className="w-full h-24 p-3 text-xs bg-white border border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+
+        <div className="grid grid-cols-2 gap-3">
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isParsing}
+            className="flex flex-col items-center justify-center gap-2 p-4 bg-white border-2 border-dashed border-blue-200 rounded-xl hover:border-blue-400 transition-all group"
+          >
+            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center group-hover:bg-blue-600 transition-colors">
+              {isParsing ? <Loader2 className="w-5 h-5 text-blue-600 animate-spin group-hover:text-white" /> : <Camera className="w-5 h-5 text-blue-600 group-hover:text-white" />}
+            </div>
+            <span className="text-xs font-bold text-blue-700">拍攝/上傳標籤</span>
+          </button>
+
+          <div className="space-y-2">
+             <p className="text-[10px] text-blue-600/80 leading-tight">
+              拍下營養標示表格，系統將自動提取數據並進行品質校驗。
+            </p>
+            <div className="h-px bg-blue-100 w-full"></div>
+            <div className="flex items-center gap-1">
+               <Info className="w-3 h-3 text-blue-400" />
+               <p className="text-[10px] text-slate-400 italic">
+                支援交叉驗證與誤判修正
+               </p>
+            </div>
+          </div>
+        </div>
+
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          onChange={handleFileChange} 
+          accept="image/*" 
+          capture="environment" 
+          className="hidden" 
         />
-        <button 
-          onClick={handleSmartParse}
-          disabled={isParsing || !ocrText.trim()}
-          className="w-full py-2 bg-blue-600 text-white text-sm font-bold rounded-xl shadow-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
-        >
-          {isParsing ? "正在辨識中..." : "一鍵自動填表"}
-        </button>
+
+        <div className="relative">
+          <textarea
+            value={ocrText}
+            onChange={e => setOcrText(e.target.value)}
+            placeholder="在此貼上標籤內容或觀察辨識結果..."
+            className="w-full h-20 p-3 text-[10px] bg-white border border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none font-mono"
+          />
+          {ocrText && !isParsing && (
+             <button 
+                onClick={() => handleSmartParse()}
+                className="absolute bottom-2 right-2 px-3 py-1 bg-blue-600 text-white text-[10px] font-bold rounded-lg shadow-sm"
+              >
+                重新解析文字
+              </button>
+          )}
+        </div>
       </div>
+
+      {/* Sanity Check Warning UI */}
+      {metadata && metadata.sanityCheck === false && (
+        <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl animate-in zoom-in-95">
+          <div className="flex gap-3">
+            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-6 h-6 text-amber-600" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-amber-900">數據可信度警告</h4>
+              <p className="text-[11px] text-amber-700 mt-0.5">系統偵測到以下異常，建議手動校對數值：</p>
+              <ul className="mt-2 space-y-1">
+                {(metadata.sanityWarnings || []).map((msg: string, i: number) => (
+                  <li key={i} className="text-[10px] text-amber-800 bg-white/50 px-2 py-1 rounded border border-amber-100/50 flex items-start gap-1">
+                    <span className="mt-1 w-1 h-1 rounded-full bg-amber-400 shrink-0" />
+                    {msg}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {metadata && metadata.sanityCheck === true && (
+        <div className="bg-emerald-50 border border-emerald-100 px-4 py-2 rounded-xl flex items-center gap-2 animate-in slide-in-from-top-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+          <span className="text-[11px] font-medium text-emerald-700">數據已通過營養學邏輯驗證</span>
+        </div>
+      )}
 
       <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 space-y-4">
         <div>
@@ -354,7 +509,13 @@ function CustomLabel({ onAdd }: { onAdd: () => void }) {
         </div>
 
         <div className="pt-2 border-t border-slate-100">
-          <p className="font-semibold text-slate-800 mb-3 text-sm">輸入營養標示</p>
+          <p className="font-semibold text-slate-800 mb-3 text-sm flex justify-between items-center">
+            <span>輸入營養標示</span>
+            {(form.calories || form.protein || form.carbs) && (
+              <span className="text-[10px] font-normal text-slate-400 italic animate-pulse">*數值已自動辨識填入</span>
+            )}
+          </p>
+          
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">每份重量 (g/ml)</label>
@@ -371,20 +532,12 @@ function CustomLabel({ onAdd }: { onAdd: () => void }) {
                 type="number"
                 value={form.calories}
                 onChange={e => setForm({...form, calories: e.target.value})}
-                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-bold text-blue-600"
               />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">碳水 (g)</label>
-              <input
-                type="number"
-                value={form.carbs}
-                onChange={e => setForm({...form, carbs: e.target.value})}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              />
-            </div>
+
+          <div className="grid grid-cols-3 gap-3 mb-4">
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">蛋白質 (g)</label>
               <input
@@ -395,12 +548,42 @@ function CustomLabel({ onAdd }: { onAdd: () => void }) {
               />
             </div>
             <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">碳水 (g)</label>
+              <input
+                type="number"
+                value={form.carbs}
+                onChange={e => setForm({...form, carbs: e.target.value})}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+            </div>
+            <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">脂肪 (g)</label>
               <input
                 type="number"
                 value={form.fat}
                 onChange={e => setForm({...form, fat: e.target.value})}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">糖 (g)</label>
+              <input
+                type="number"
+                value={form.sugar}
+                onChange={e => setForm({...form, sugar: e.target.value})}
+                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">鈉 (mg)</label>
+              <input
+                type="number"
+                value={form.sodium}
+                onChange={e => setForm({...form, sodium: e.target.value})}
+                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
             </div>
           </div>
