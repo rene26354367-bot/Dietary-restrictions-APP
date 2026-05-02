@@ -31,6 +31,9 @@
 - **別名提示顯示**：搜尋結果新增 `matchedAlias` 欄位，前端顯示灰字提示使用者「官方名（俗名）」對應關係，減少混淆。
 - **OCR 雙欄位識別增強**：支援 stacked header 排版（例如「營養標示」下方換行再列「每一份量」），使用 `_detectColumnLayout()` 動態檢測排版。
 - **OCR 多行數值抽取**：實裝 `consumed` 集合追蹤，防止糖分標籤 (sub-label) 誤用碳水化合物的克數。
+- **智慧建議引擎**：`AppEngine.getAdvice()` 根據當日紀錄自動產生個人化建議（熱量缺口、蛋白質補充、鈉含量警告、週趨勢）。
+- **智慧建議 API**：`/api/advice?date=` 端點，回傳帶 `type`（info / warning / danger / success）的建議卡片陣列。
+- **DailySummary 建議 UI**：每日摘要頁底部新增建議卡片區塊，依類型顯示對應顏色與圖示。
 
 ### Fixed (修正)
 - **[P0] OCR 份量換算殘留錯誤**：根本原因是雙欄位標籤（每份/每100g）識別失敗，現已完全修正。
@@ -48,6 +51,12 @@
   - `"牛奶": "牛乳"` → 改為 `"鮮乳"`（DB 無「牛乳」項目，有「全脂鮮乳」「低脂鮮乳」等）。
   - `"白米": "白米飯"` → 改為 `"白飯"`；新增 `"白米飯": "白飯"`（DB 項目名稱是「白飯」不是「白米飯」）。
 
+- **BodyStats.tsx 白屏崩潰**：元件中三段 `// ... (unchanged)` 佔位符取代了真實程式碼，導致 render 時大量 ReferenceError。
+  - 補回 `BodyMetric` 型別 + `metricConfig` 常數（第 8 行佔位符）。
+  - 補回所有表單 state（`logDate / height / weight / bodyFat / isEditing / timeRange / activeMetric`）及 `handleSave / handleDateChange / startEdit` handler（第 13 行佔位符）。
+  - 移除無意義的 `// ... (rest of render logic)` 過場注解（第 52 行）。
+  - 加入 `BodyLog` import + `Object.values() as BodyLog[]` 型別斷言，清除 TS2339 型別錯誤。
+
 ### Challenges (遇到的問題 & 解決過程)
 - **fullName 搜尋誤判**：初期嘗試在 `db_manager.searchFood()` 中搜 `fullName` 欄位，導致「千島沙拉醬」(fullName 含「小黃瓜」作為食材成分) 被意外返回。決議：放棄 fullName 搜尋，改由 aliases.json + 二層搜尋架構解決。
   
@@ -55,9 +64,13 @@
 
 - **搜尋排序決策**：直接名稱匹配 (「牛奶」在食物名中) vs 別名展開的官方食材，哪個應優先？確定為別名優先，因使用者輸入別名時的意圖是"找官方食材"，不是"找巧合包含這個詞的加工食品"。實裝時從簡單的 `allResults.push()` 改為區分 `directResults` 與 `aliasResults` 並排序。
 
+### Challenges (BodyStats 崩潰根因)
+- **AI 工具輸出截斷問題**：Gemini 在輸出「未改動部分省略」的程式碼時，以 `// ... (unchanged)` 取代了真實的 state 宣告，這種截斷格式若直接覆蓋原始檔案，會靜默破壞元件。後續修復只需補回邏輯，但若未被察覺可能長期潛伏。
+
 ### 驗證狀況
 - **API 端點測試**：隨機抽樣 10 個俗名搜尋，10/10 成功通過（涵蓋別名單/雙層展開、直搜無別名等場景）。
 - **OCR 修正驗證**：示範圖片 `2016-06-08 at 10-09-46.jpg` 從誤認的 220.1 kcal (每份) 改正為 244.6 kcal (每100g)。批量 14 張圖片掃描，顯著減少誤差。
+- **BodyStats 修復驗證**：點擊身體分頁不再白屏，表單輸入、歷史清單、趨勢圖均正常運作。
 
 ---
 
