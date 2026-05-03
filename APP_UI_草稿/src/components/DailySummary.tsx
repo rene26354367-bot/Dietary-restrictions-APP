@@ -10,6 +10,7 @@ export default function DailySummary() {
   const { targets, dailyLogs, currentDate, setDate, removeEntry, updateEntry } = useDiet();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [advice, setAdvice] = useState<any[]>([]);
+  const [isAdviceExpanded, setIsAdviceExpanded] = useState(true);
 
   // 取得智慧建議
   useEffect(() => {
@@ -125,32 +126,43 @@ export default function DailySummary() {
       {advice.length > 0 && (
         <div className="px-4 mt-6">
           <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center">
-                <Lightbulb className="w-4 h-4 text-blue-500" />
-              </div>
-              <h3 className="font-bold text-slate-800 text-sm">智慧分析建議</h3>
-            </div>
-            <div className="space-y-3">
-              {advice.map((item, i) => (
-                <div 
-                  key={i} 
-                  className={cn(
-                    "p-3 rounded-2xl flex items-start gap-3 transition-all animate-in fade-in slide-in-from-left-2",
-                    item.type === 'success' ? "bg-emerald-50 text-emerald-700 border border-emerald-100" :
-                    item.type === 'warning' ? "bg-amber-50 text-amber-700 border border-amber-100" :
-                    item.type === 'danger' ? "bg-rose-50 text-rose-700 border border-rose-100" :
-                    "bg-blue-50 text-blue-700 border border-blue-100"
-                  )}
-                >
-                  {item.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" /> :
-                   item.type === 'warning' ? <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> :
-                   item.type === 'danger' ? <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> :
-                   <Info className="w-4 h-4 shrink-0 mt-0.5" />}
-                  <p className="text-xs font-medium leading-relaxed">{item.text}</p>
+            <button 
+              onClick={() => setIsAdviceExpanded(!isAdviceExpanded)}
+              className="w-full flex items-center justify-between"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center">
+                  <Lightbulb className="w-4 h-4 text-blue-500" />
                 </div>
-              ))}
-            </div>
+                <h3 className="font-bold text-slate-800 text-sm">智慧分析建議</h3>
+              </div>
+              <div className={cn("transition-transform duration-200", isAdviceExpanded ? "rotate-180" : "")}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400"><path d="m6 9 6 6 6-6"/></svg>
+              </div>
+            </button>
+
+            {isAdviceExpanded && (
+              <div className="space-y-3 mt-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                {advice.map((item, i) => (
+                  <div 
+                    key={i} 
+                    className={cn(
+                      "p-3 rounded-2xl flex items-start gap-3 transition-all",
+                      item.type === 'success' ? "bg-emerald-50 text-emerald-700 border border-emerald-100" :
+                      item.type === 'warning' ? "bg-amber-50 text-amber-700 border border-amber-100" :
+                      item.type === 'danger' ? "bg-rose-50 text-rose-700 border border-rose-100" :
+                      "bg-blue-50 text-blue-700 border border-blue-100"
+                    )}
+                  >
+                    {item.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" /> :
+                    item.type === 'warning' ? <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> :
+                    item.type === 'danger' ? <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> :
+                    <Info className="w-4 h-4 shrink-0 mt-0.5" />}
+                    <p className="text-xs font-medium leading-relaxed">{item.text}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

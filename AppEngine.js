@@ -38,7 +38,7 @@ class AppEngine {
     
     // 執行資料遷移：確保舊格式的 Log 轉為 2.0 規格
     this.dailyLogs = this._migrateLogs(savedData.dailyLogs || {});
-    this.bodyLogs = savedData.bodyLogs || [];
+    this.bodyLogs = this._repairBodyLogs(savedData.bodyLogs || []);
     this.customFoods = this._migrateCustomFoods(savedData.customFoods || []);
     this.barcodeCache = savedData.barcodeCache || {};
     
@@ -53,6 +53,23 @@ class AppEngine {
       USER: 'user_custom',
       OFF: 'open_food_facts'
     };
+  }
+
+  /**
+   * 修補身體紀錄，確保 BMI 與 LeanBodyMass 存在
+   */
+  _repairBodyLogs(logs) {
+    if (!Array.isArray(logs)) return [];
+    return logs.map(log => {
+      const height = log.height || (this.userProfile ? this.userProfile.height : null);
+      if (height && log.weight && !log.bmi) {
+        log.bmi = parseFloat((log.weight / ((height / 100) ** 2)).toFixed(1));
+      }
+      if (log.weight && log.bodyFat && !log.leanBodyMass) {
+        log.leanBodyMass = parseFloat((log.weight * (1 - log.bodyFat / 100)).toFixed(1));
+      }
+      return log;
+    });
   }
 
   /**

@@ -5,7 +5,7 @@ import { format, parseISO, subDays, startOfDay, differenceInDays, isBefore } fro
 import { Calendar, Filter, PieChart as PieIcon, TrendingUp, Info } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-type MetricType = 'calories' | 'protein' | 'carbs' | 'fat' | 'weight' | 'avgCalories';
+type MetricType = 'calories' | 'protein' | 'carbs' | 'fat' | 'weight' | 'avgCalories' | 'avgProtein' | 'avgCarbs' | 'avgFat';
 type TimeRange = '7days' | '30days' | 'custom';
 
 const metricConfig = {
@@ -13,8 +13,11 @@ const metricConfig = {
   avgCalories: { label: '7日平均熱量', color: '#93c5fd', key: 'avgCalories' },
   weight: { label: '體重 (kg)', color: '#8b5cf6', key: 'weight' },
   protein: { label: '蛋白質 (g)', color: '#f43f5e', key: 'protein' },
+  avgProtein: { label: '平均蛋白', color: '#fda4af', key: 'avgProtein' },
   carbs: { label: '碳水 (g)', color: '#d97706', key: 'carbs' },
+  avgCarbs: { label: '平均碳水', color: '#fcd34d', key: 'avgCarbs' },
   fat: { label: '脂肪 (g)', color: '#10b981', key: 'fat' },
+  avgFat: { label: '平均脂肪', color: '#6ee7b7', key: 'avgFat' },
 };
 
 const MACRO_COLORS = ['#d97706', '#f43f5e', '#10b981']; // Carbs, Protein, Fat
@@ -75,13 +78,16 @@ export default function NutritionStats() {
       totalP += protein;
       totalF += fat;
 
-      // Rolling Average calculation (simple version for the chart window)
-      let sumCals = 0, count = 0;
+      // Rolling Average calculation
+      let sumCals = 0, sumP = 0, sumC = 0, sumF = 0, count = 0;
       for (let j = 0; j < 7; j++) {
         const prevD = format(subDays(currentDateObj, j), 'yyyy-MM-dd');
         const prevLog = dailyLogs[prevD];
-        if (prevLog && prevLog.entries.length > 0) {
+        if (prevLog && prevLog.entries && prevLog.entries.length > 0) {
           sumCals += prevLog.entries.reduce((s, e) => s + e.calories, 0);
+          sumP += prevLog.entries.reduce((s, e) => s + (e.protein || 0), 0);
+          sumC += prevLog.entries.reduce((s, e) => s + (e.carbs || 0), 0);
+          sumF += prevLog.entries.reduce((s, e) => s + (e.fat || 0), 0);
           count++;
         }
       }
@@ -92,8 +98,11 @@ export default function NutritionStats() {
         calories: Math.round(calories),
         avgCalories: count > 0 ? Math.round(sumCals / count) : null,
         protein: Math.round(protein),
+        avgProtein: count > 0 ? Math.round(sumP / count) : null,
         carbs: Math.round(carbs),
+        avgCarbs: count > 0 ? Math.round(sumC / count) : null,
         fat: Math.round(fat),
+        avgFat: count > 0 ? Math.round(sumF / count) : null,
         weight: bodyLog ? bodyLog.weight : null,
       });
     }
@@ -164,21 +173,73 @@ export default function NutritionStats() {
           </div>
 
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1">
-              <TrendingUp className="w-3.5 h-3.5 text-blue-500" /> 週期平均攝取
+            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-1">
+              <TrendingUp className="w-3.5 h-3.5 text-blue-500" /> 週期平均攝取 (日均)
             </h3>
-            <p className="text-4xl font-black text-slate-800 leading-none">
-              {chartData.length > 0 ? chartData[chartData.length - 1].avgCalories || 0 : 0} 
-              <span className="text-sm font-bold text-slate-300 ml-2 italic">kcal/day</span>
-            </p>
-            <div className="mt-4 flex items-center gap-2">
-              <span className={cn("text-[10px] font-black px-2 py-1 rounded-lg", 
-                (chartData[chartData.length-1]?.avgCalories || 0) > (targets?.summary.targetCalories || 0) 
-                ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600"
-              )}>
-                {(chartData[chartData.length-1]?.avgCalories || 0) > (targets?.summary.targetCalories || 0) ? '⚠ 稍高於目標' : '✓ 控制良好'}
-              </span>
-              <span className="text-[10px] text-slate-400 font-medium">目標 {targets?.summary.targetCalories} kcal</span>
+            
+            <div className="grid grid-cols-2 gap-y-6 gap-x-4">
+              <div className="col-span-2 pb-4 border-b border-slate-50">
+                <p className="text-[10px] font-black text-blue-500 uppercase mb-1">平均熱量</p>
+                <p className="text-4xl font-black text-slate-800 leading-none">
+                  {chartData.length > 0 ? chartData[chartData.length - 1].avgCalories || 0 : 0} 
+                  <span className="text-sm font-bold text-slate-300 ml-2 italic uppercase">kcal</span>
+                </p>
+              </div>
+
+              <div>
+                <p className="text-[10px] font-black text-amber-500 uppercase mb-1">平均碳水</p>
+                <p className="text-xl font-black text-slate-700 leading-none">
+                  {chartData.length > 0 ? chartData[chartData.length - 1].avgCarbs || 0 : 0}
+                  <span className="text-[10px] font-bold text-slate-300 ml-1 uppercase">g</span>
+                </p>
+              </div>
+
+              <div>
+                <p className="text-[10px] font-black text-rose-500 uppercase mb-1">平均蛋白</p>
+                <p className="text-xl font-black text-slate-700 leading-none">
+                  {chartData.length > 0 ? chartData[chartData.length - 1].avgProtein || 0 : 0}
+                  <span className="text-[10px] font-bold text-slate-300 ml-1 uppercase">g</span>
+                </p>
+              </div>
+
+              <div>
+                <p className="text-[10px] font-black text-emerald-500 uppercase mb-1">平均脂肪</p>
+                <p className="text-xl font-black text-slate-700 leading-none">
+                  {chartData.length > 0 ? chartData[chartData.length - 1].avgFat || 0 : 0}
+                  <span className="text-[10px] font-bold text-slate-300 ml-1 uppercase">g</span>
+                </p>
+              </div>
+
+              <div className="col-span-2 pt-2">
+                <div className="flex items-center gap-2">
+                  {(() => {
+                    const avg = chartData[chartData.length - 1]?.avgCalories || 0;
+                    const target = targets?.summary.targetCalories || 2000;
+                    const ratio = avg / target;
+
+                    if (ratio < 0.9) {
+                      return (
+                        <span className="text-[10px] font-black px-2 py-1 rounded-lg bg-amber-50 text-amber-600">
+                          ⚠ 建議多補充
+                        </span>
+                      );
+                    } else if (ratio > 1.1) {
+                      return (
+                        <span className="text-[10px] font-black px-2 py-1 rounded-lg bg-rose-50 text-rose-600">
+                          ⚠ 攝取過高警示
+                        </span>
+                      );
+                    } else {
+                      return (
+                        <span className="text-[10px] font-black px-2 py-1 rounded-lg bg-emerald-50 text-emerald-600">
+                          ✓ 控制良好
+                        </span>
+                      );
+                    }
+                  })()}
+                  <span className="text-[10px] text-slate-400 font-medium">目標 {targets?.summary.targetCalories} kcal</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

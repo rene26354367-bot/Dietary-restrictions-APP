@@ -80,14 +80,18 @@ function PresetSearch({ onAdd }: { onAdd: () => void }) {
 
   const handleSave = () => {
     if (!selected) return;
-    const ratio = amount / selected.baseGrams;
+    const base = Number(selected.baseGrams) || 100;
+    const ratio = amount / base;
+    
+    const getVal = (val: any) => (parseFloat(val) || 0) * ratio;
+
     addEntry({
       name: selected.name,
       amountEaten: amount,
-      calories: selected.calories * ratio,
-      protein: selected.protein * ratio,
-      carbs: selected.carbs * ratio,
-      fat: selected.fat * ratio,
+      calories: getVal(selected.calories),
+      protein: getVal(selected.protein),
+      carbs: getVal(selected.carbs),
+      fat: getVal(selected.fat),
       mealType,
     }, entryDate);
     onAdd();
@@ -116,7 +120,10 @@ function PresetSearch({ onAdd }: { onAdd: () => void }) {
           {results.length > 0 ? results.map(item => (
             <button
               key={item.id}
-              onClick={() => { setSelected(item); setAmount(item.baseGrams); }}
+              onClick={() => { 
+                setSelected(item); 
+                setAmount(Number(item.baseGrams) || 100); 
+              }}
               className="w-full text-left px-4 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors flex justify-between items-center"
             >
             <div className="flex-1">
@@ -131,21 +138,21 @@ function PresetSearch({ onAdd }: { onAdd: () => void }) {
                     <p className="text-[11px] text-slate-400 mt-0.5">{item.matchedAlias}</p>
                   )}
                   <span className="text-sm font-black text-blue-600">
-                    {item.calories.toFixed(0)} <span className="text-[10px] font-medium text-slate-400">kcal</span>
+                    {typeof item.calories === 'number' ? item.calories.toFixed(0) : (parseFloat(item.calories) || 0).toFixed(0)} <span className="text-[10px] font-medium text-slate-400">kcal</span>
                   </span>
                 </div>
                 <div className="flex gap-3 mt-1.5">
                   <div className="flex items-center gap-1">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
-                    <span className="text-[11px] text-slate-500">蛋 {item.protein.toFixed(1)}g</span>
+                    <span className="text-[11px] text-slate-500">蛋 {typeof item.protein === 'number' ? item.protein.toFixed(1) : (parseFloat(item.protein) || 0).toFixed(1)}g</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <div className="w-1.5 h-1.5 rounded-full bg-amber-400"></div>
-                    <span className="text-[11px] text-slate-500">碳 {item.carbs.toFixed(1)}g</span>
+                    <span className="text-[11px] text-slate-500">碳 {typeof item.carbs === 'number' ? item.carbs.toFixed(1) : (parseFloat(item.carbs) || 0).toFixed(1)}g</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <div className="w-1.5 h-1.5 rounded-full bg-rose-400"></div>
-                    <span className="text-[11px] text-slate-500">脂 {item.fat.toFixed(1)}g</span>
+                    <span className="text-[11px] text-slate-500">脂 {typeof item.fat === 'number' ? item.fat.toFixed(1) : (parseFloat(item.fat) || 0).toFixed(1)}g</span>
                   </div>
                 </div>
               </div>
@@ -161,7 +168,7 @@ function PresetSearch({ onAdd }: { onAdd: () => void }) {
           <div className="flex justify-between items-start mb-6">
             <div>
               <h3 className="text-lg font-bold text-slate-800">{selected.name}</h3>
-              <p className="text-sm text-slate-500">每 {selected.baseGrams}g 含有 {selected.calories} kcal</p>
+              <p className="text-sm text-slate-500">每 {selected.baseGrams || 100}g 含有 {selected.calories} kcal</p>
             </div>
             <button onClick={() => setSelected(null)} className="text-sm text-blue-600 font-medium">重選</button>
           </div>

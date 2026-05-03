@@ -115,7 +115,30 @@ app.post('/api/user-data', (req, res) => {
 
 // 3. 搜尋食材 API
 app.get('/api/search', (req, res) => {
-    // ... rest of search logic
+    const q = req.query.q;
+    if (!q) return res.json([]);
+
+    console.log(`[Search] 正在搜尋: ${q}`);
+    const results = engine.smartSearch(q);
+    
+    // 轉換為前端 UI 預期的格式
+    const uiResults = results.map(r => ({
+        id: r.id,
+        name: r.name,
+        brand: r.brand || "通用",
+        calories: r.nutrients ? (r.nutrients.calories * 100).toFixed(1) : (r.calories || 0).toFixed(1),
+        protein: r.nutrients ? (r.nutrients.protein * 100).toFixed(1) : (r.protein || 0).toFixed(1),
+        carbs: r.nutrients ? (r.nutrients.carbohydrate * 100).toFixed(1) : (r.carbs || 0).toFixed(1),
+        fat: r.nutrients ? (r.nutrients.fat * 100).toFixed(1) : (r.fat || 0).toFixed(1),
+        sugar: r.nutrients ? (r.nutrients.sugar * 100).toFixed(1) : (r.sugar || 0).toFixed(1),
+        sodium: r.nutrients ? (r.nutrients.sodium * 100).toFixed(1) : (r.sodium || 0).toFixed(1),
+        source: r.source,
+        verified: r.verified,
+        matchedAlias: r.matchedAlias,
+        isFallback: r.isFallback
+    }));
+
+    res.json(uiResults);
 });
 
 // 4. 智慧建議 API

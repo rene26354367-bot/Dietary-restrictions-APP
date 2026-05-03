@@ -24,6 +24,8 @@ export interface BodyLog {
   weight: number;
   height: number;
   bodyFat?: number;
+  bmi?: number;
+  leanBodyMass?: number;
 }
 
 export interface CustomFood {
@@ -37,16 +39,25 @@ export interface CustomFood {
   baseGrams: number;
 }
 
+export interface CustomTargets {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
 interface DietContextType {
   userProfile: UserProfile | null;
   targets: NutritionalTargets | null;
+  customTargets: CustomTargets | null;
   dailyLogs: Record<string, DailyLog>;
   bodyLogs: Record<string, BodyLog>;
   customFoods: CustomFood[];
   currentDate: string;
   saveProfile: (profile: UserProfile) => void;
+  saveCustomTargets: (targets: CustomTargets | null) => void;
   addEntry: (entry: Omit<DietEntry, 'id' | 'timestamp'>, targetDate?: string) => void;
-  removeEntry: (id: string) => void;
+  removeEntry: (id: string, targetDate?: string) => void;
   updateEntry: (id: string, updatedEntry: Partial<Omit<DietEntry, 'id' | 'timestamp'>>, targetDate?: string) => void;
   setDate: (date: string) => void;
   addBodyLog: (date: string, weight: number, height: number, bodyFat?: number) => void;
@@ -58,6 +69,7 @@ const DietContext = createContext<DietContextType | undefined>(undefined);
 export const DietProvider = ({ children }: { children: ReactNode }) => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [targets, setTargets] = useState<NutritionalTargets | null>(null);
+  const [customTargets, setCustomTargets] = useState<CustomTargets | null>(null);
   const [dailyLogs, setDailyLogs] = useState<Record<string, DailyLog>>({});
   const [bodyLogs, setBodyLogs] = useState<Record<string, BodyLog>>({});
   const [customFoods, setCustomFoods] = useState<CustomFood[]>([]);
@@ -70,6 +82,7 @@ export const DietProvider = ({ children }: { children: ReactNode }) => {
       .then(res => res.json())
       .then(data => {
         if (data.profile) setUserProfile(data.profile);
+        if (data.customTargets) setCustomTargets(data.customTargets);
         if (data.dailyLogs) setDailyLogs(data.dailyLogs);
         if (data.bodyLogs) setBodyLogs(data.bodyLogs);
         if (data.customFoods) setCustomFoods(data.customFoods);
@@ -79,11 +92,13 @@ export const DietProvider = ({ children }: { children: ReactNode }) => {
         console.error("Failed to load data from API, falling back to localStorage", err);
         // Fallback to localStorage
         const savedProfile = localStorage.getItem('diet_profile');
+        const savedCustomTargets = localStorage.getItem('custom_targets');
         const savedLogs = localStorage.getItem('diet_logs');
         const savedBody = localStorage.getItem('body_logs');
         const savedCustom = localStorage.getItem('custom_foods');
         
         if (savedProfile) setUserProfile(JSON.parse(savedProfile));
+        if (savedCustomTargets) setCustomTargets(JSON.parse(savedCustomTargets));
         if (savedLogs) setDailyLogs(JSON.parse(savedLogs));
         if (savedBody) setBodyLogs(JSON.parse(savedBody));
         if (savedCustom) setCustomFoods(JSON.parse(savedCustom));
@@ -93,10 +108,26 @@ export const DietProvider = ({ children }: { children: ReactNode }) => {
 
   // 更新 Target
   useEffect(() => {
-    if (userProfile) {
+    if (customTargets) {
+      // 優先使用自定義目標
+      setTargets({
+        summary: {
+          bmi: userProfile ? parseFloat((userProfile.weight / ((userProfile.height / 100) ** 2)).toFixed(1)) : 0,
+          bmiLabel: '自定義目標',
+          targetCalories: customTargets.calories,
+        },
+        macros: {
+          protein: { g: customTargets.protein, kcal: customTargets.protein * 4 },
+          carbohydrate: { g: customTargets.carbs, kcal: customTargets.carbs * 4 },
+          fat: { g: customTargets.fat, kcal: customTargets.fat * 9 },
+        },
+        activityLevel: userProfile?.activityLevel || 'moderate',
+      });
+    } else if (userProfile) {
+      // 否則自動計算
       setTargets(UserTargetCalculator.calculate(userProfile));
     }
-  }, [userProfile]);
+  }, [userProfile, customTargets]);
 
   // 同步回傳給後端與 localStorage (做為雙保險)
   useEffect(() => {
@@ -104,12 +135,14 @@ export const DietProvider = ({ children }: { children: ReactNode }) => {
 
     const allData = {
       profile: userProfile,
+      customTargets,
       dailyLogs,
       bodyLogs,
       customFoods
     };
 
     localStorage.setItem('diet_profile', JSON.stringify(userProfile));
+    localStorage.setItem('custom_targets', JSON.stringify(customTargets));
     localStorage.setItem('diet_logs', JSON.stringify(dailyLogs));
     localStorage.setItem('body_logs', JSON.stringify(bodyLogs));
     localStorage.setItem('custom_foods', JSON.stringify(customFoods));
@@ -120,10 +153,14 @@ export const DietProvider = ({ children }: { children: ReactNode }) => {
       body: JSON.stringify(allData)
     }).catch(err => console.error("Sync to API failed", err));
 
-  }, [userProfile, dailyLogs, bodyLogs, customFoods, isLoading]);
+  }, [userProfile, customTargets, dailyLogs, bodyLogs, customFoods, isLoading]);
 
   const saveProfile = (profile: UserProfile) => {
     setUserProfile(profile);
+  };
+
+  const saveCustomTargets = (targets: CustomTargets | null) => {
+    setCustomTargets(targets);
   };
 
   const addEntry = (entryRaw: Omit<DietEntry, 'id' | 'timestamp'>, targetDate?: string) => {
@@ -186,9 +223,12 @@ export const DietProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addBodyLog = (date: string, weight: number, height: number, bodyFat?: number) => {
+    const bmi = parseFloat((weight / ((height / 100) ** 2)).toFixed(1));
+    const leanBodyMass = bodyFat ? parseFloat((weight * (1 - bodyFat / 100)).toFixed(1)) : undefined;
+
     setBodyLogs(prev => ({
       ...prev,
-      [date]: { date, weight, height, bodyFat }
+      [date]: { date, weight, height, bodyFat, bmi, leanBodyMass }
     }));
     
     // 同步更新當前 Profile 中的體重（如果是今天或最新的）
@@ -203,7 +243,10 @@ export const DietProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <DietContext.Provider value={{ userProfile, targets, dailyLogs, bodyLogs, customFoods, currentDate, saveProfile, addEntry, removeEntry, setDate, addBodyLog, addCustomFood }}>
+    <DietContext.Provider value={{ 
+      userProfile, targets, customTargets, dailyLogs, bodyLogs, customFoods, currentDate, 
+      saveProfile, saveCustomTargets, addEntry, removeEntry, updateEntry, setDate, addBodyLog, addCustomFood 
+    }}>
       {children}
     </DietContext.Provider>
   );
