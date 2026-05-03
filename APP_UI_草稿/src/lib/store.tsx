@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { UserProfile, NutritionalTargets, UserTargetCalculator } from './calculator';
 import { format } from 'date-fns';
+import { storage } from './storage/adapter';
+import type { AllUserData } from './storage/types';
 
 export interface DietEntry {
   id: string;
@@ -76,34 +78,25 @@ export const DietProvider = ({ children }: { children: ReactNode }) => {
   const [currentDate, setCurrentDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [isLoading, setIsLoading] = useState(true);
 
-  // 初始化：從後端 API 讀取資料
+  // 套用資料到 React state（共用邏輯，初次載入與背景同步都用）
+  const applyData = (data: AllUserData) => {
+    if (data.profile) setUserProfile(data.profile);
+    if (data.customTargets) setCustomTargets(data.customTargets);
+    if (data.dailyLogs) setDailyLogs(data.dailyLogs);
+    if (data.bodyLogs) setBodyLogs(data.bodyLogs);
+    if (data.customFoods) setCustomFoods(data.customFoods);
+  };
+
+  // 初始化：透過 StorageAdapter 載入（IndexedDB 優先，API 背景同步）
   useEffect(() => {
-    fetch('http://localhost:3001/api/user-data')
-      .then(res => res.json())
-      .then(data => {
-        if (data.profile) setUserProfile(data.profile);
-        if (data.customTargets) setCustomTargets(data.customTargets);
-        if (data.dailyLogs) setDailyLogs(data.dailyLogs);
-        if (data.bodyLogs) setBodyLogs(data.bodyLogs);
-        if (data.customFoods) setCustomFoods(data.customFoods);
-        setIsLoading(false);
-      })
-      .catch(err => {
-        console.error("Failed to load data from API, falling back to localStorage", err);
-        // Fallback to localStorage
-        const savedProfile = localStorage.getItem('diet_profile');
-        const savedCustomTargets = localStorage.getItem('custom_targets');
-        const savedLogs = localStorage.getItem('diet_logs');
-        const savedBody = localStorage.getItem('body_logs');
-        const savedCustom = localStorage.getItem('custom_foods');
-        
-        if (savedProfile) setUserProfile(JSON.parse(savedProfile));
-        if (savedCustomTargets) setCustomTargets(JSON.parse(savedCustomTargets));
-        if (savedLogs) setDailyLogs(JSON.parse(savedLogs));
-        if (savedBody) setBodyLogs(JSON.parse(savedBody));
-        if (savedCustom) setCustomFoods(JSON.parse(savedCustom));
-        setIsLoading(false);
-      });
+    storage.load().then(data => {
+      applyData(data);
+      setIsLoading(false);
+    });
+
+    // 監聽背景同步：若 API 拉到比本機更新的資料，自動套用
+    const unsubscribe = storage.onUpdate(applyData);
+    return unsubscribe;
   }, []);
 
   // 更新 Target
@@ -129,29 +122,18 @@ export const DietProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [userProfile, customTargets]);
 
-  // 同步回傳給後端與 localStorage (做為雙保險)
+  // 持久化：state 任何變動都透過 StorageAdapter 寫入
+  // (IndexedDB 必成 + API best-effort 同步)
   useEffect(() => {
     if (isLoading) return;
 
-    const allData = {
+    storage.save({
       profile: userProfile,
       customTargets,
       dailyLogs,
       bodyLogs,
       customFoods
-    };
-
-    localStorage.setItem('diet_profile', JSON.stringify(userProfile));
-    localStorage.setItem('custom_targets', JSON.stringify(customTargets));
-    localStorage.setItem('diet_logs', JSON.stringify(dailyLogs));
-    localStorage.setItem('body_logs', JSON.stringify(bodyLogs));
-    localStorage.setItem('custom_foods', JSON.stringify(customFoods));
-
-    fetch('http://localhost:3001/api/user-data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(allData)
-    }).catch(err => console.error("Sync to API failed", err));
+    }).catch(err => console.error('[Store] 儲存失敗:', err));
 
   }, [userProfile, customTargets, dailyLogs, bodyLogs, customFoods, isLoading]);
 
