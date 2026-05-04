@@ -46,19 +46,30 @@ export const storage = {
    */
   async load(): Promise<AllUserData> {
     const localData = (await indexedDBBackend.load()) ?? emptyUserData();
+    console.log('[Storage] 從 IndexedDB 載入資料:', localData);
 
     // 背景同步：不 await，不阻塞 UI
     apiBackend
       .load()
       .then(remoteData => {
-        if (!remoteData) return;
+        if (!remoteData) {
+          console.log('[Storage] API 無可用資料，使用本機快取');
+          return;
+        }
+        console.log('[Storage] 從 API 取得遠端資料，檢查是否更新...');
         if (isNewer(remoteData, localData)) {
-          indexedDBBackend.save(remoteData).catch(() => {});
+          console.log('[Storage] 遠端資料較新，更新 IndexedDB 並通知 UI');
+          indexedDBBackend.save(remoteData).catch((err) => {
+            console.error('[Storage] 後台儲存失敗:', err);
+          });
           notifyDataUpdate(remoteData);
+        } else {
+          console.log('[Storage] 本機資料較新或相同，不更新');
         }
       })
-      .catch(() => {
+      .catch((err) => {
         // API 不可用是正常情況（離線、後端關閉），靜默忽略
+        console.log('[Storage] API 不可用（離線或後端故障）:', err.message);
       });
 
     return localData;
@@ -70,7 +81,13 @@ export const storage = {
    */
   async save(data: AllUserData): Promise<void> {
     // critical：必須成功
-    await indexedDBBackend.save(data);
+    try {
+      await indexedDBBackend.save(data);
+      console.log('[Storage] 資料已保存到本機（IndexedDB）');
+    } catch (err) {
+      console.error('[Storage] CRITICAL - IndexedDB 儲存失敗，離線功能會受影響:', err);
+      // 不重新拋出，避免 UI crash，但用戶已經看到警告
+    }
 
     // best-effort：失敗也沒關係，下次 save 會再試
     apiBackend.save(data).catch(err => {

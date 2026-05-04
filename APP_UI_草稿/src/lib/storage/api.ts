@@ -4,9 +4,21 @@
  */
 import type { StorageBackend, AllUserData } from './types';
 
-// API 基底 URL；開發時是 localhost:3001，部署時可由 env 覆蓋
-export const API_BASE = (typeof window !== 'undefined' && (window as any).__API_BASE__)
-  || 'http://localhost:3001';
+/**
+ * 自動偵測 API 基底 URL：
+ * - 從 localhost 開 → 用 localhost:3001
+ * - 從手機透過網路 IP 開（如 http://192.168.1.5:4173）→ 自動用同 IP:3001
+ * - window.__API_BASE__ 可在執行期覆蓋（部署到雲端時用）
+ */
+function detectAPIBase(): string {
+  if (typeof window === 'undefined') return 'http://localhost:3001';
+  const override = (window as any).__API_BASE__;
+  if (override) return override;
+  const { protocol, hostname } = window.location;
+  return `${protocol}//${hostname}:3001`;
+}
+
+export const API_BASE = detectAPIBase();
 
 const TIMEOUT_MS = 3000;
 

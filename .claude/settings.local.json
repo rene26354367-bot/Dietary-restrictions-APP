@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node ../diagnose_ocr.js)",
+      "Bash(node diagnose_ocr.js)",
+      "Bash(node test_ocr_parser_v5.js)",
+      "Bash(node test_ocr_parser_v4.js)",
+      "Bash(node test_all_images.js)",
+      "Bash(node -e ' *)",
+      "Bash(node server.cjs)",
+      "Bash(powershell -Command \"Stop-Process -Id \\(Get-NetTCPConnection -LocalPort 3001 -State Listen\\).OwningProcess -Force\")",
+      "Bash(Get-Process -Name \"node\" -ErrorAction SilentlyContinue)",
+      "Bash(Stop-Process -Force)",
+      "Bash(Start-Sleep -Seconds 1)",
+      "Bash(Start-Process -FilePath \"node\" -ArgumentList \"server.cjs\" -WindowStyle Hidden)",
+      "Bash(Start-Sleep -Seconds 3)",
+      "Bash(Write-Host \"Server restarted\")",
+      "PowerShell(Get-Process -Name \"node\" -ErrorAction SilentlyContinue)",
+      "PowerShell(Stop-Process -Force)",
+      "PowerShell(Start-Process -FilePath \"node\" -ArgumentList \"server.cjs\" -WorkingDirectory $serverPath -WindowStyle Hidden)",
+      "PowerShell($serverPath = \"C:\\\\Users\\\\user\\\\Desktop\\\\gemini_CLI_�u�@�M��\\\\������iAPP��� - subagent��\\\\APP_UI_��Z\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Read(//c/Users/user/.claude/**)",
+      "Bash(npm create *)",
+      "Bash(npm install *)",
+      "Bash(curl -s http://localhost:3001/api/philosophers)",
+      "Bash(node -e \"const d=JSON.parse\\(require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\)\\); console.log\\('哲學家數量:', d.length\\); d.forEach\\(p=>console.log\\(' -', p.name, p.originalName\\)\\)\")",
+      "Bash(node -e \"process.stdin.resume\\(\\); let d=''; process.stdin.on\\('data',c=>d+=c\\); process.stdin.on\\('end',\\(\\)=>{const a=JSON.parse\\(d\\); console.log\\('哲學家數量:', a.length\\); a.forEach\\(p=>console.log\\(' -',p.name,p.originalName, p.region\\)\\);}\\)\")",
+      "Bash(npm run *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5174/)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__Claude_in_Chrome__browser_batch",
+      "Bash(grep -E \"server|cjs|js$\")"
+    ]
+  }
+}

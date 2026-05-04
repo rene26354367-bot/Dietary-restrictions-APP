@@ -80,11 +80,12 @@ export const DietProvider = ({ children }: { children: ReactNode }) => {
 
   // 套用資料到 React state（共用邏輯，初次載入與背景同步都用）
   const applyData = (data: AllUserData) => {
-    if (data.profile) setUserProfile(data.profile);
-    if (data.customTargets) setCustomTargets(data.customTargets);
-    if (data.dailyLogs) setDailyLogs(data.dailyLogs);
-    if (data.bodyLogs) setBodyLogs(data.bodyLogs);
-    if (data.customFoods) setCustomFoods(data.customFoods);
+    // 使用 null coalescing 而非 if，確保都更新（包括空 object）
+    setUserProfile(data.profile);
+    setCustomTargets(data.customTargets);
+    setDailyLogs(data.dailyLogs ?? {});
+    setBodyLogs(data.bodyLogs ?? {});
+    setCustomFoods(data.customFoods ?? []);
   };
 
   // 初始化：透過 StorageAdapter 載入（IndexedDB 優先，API 背景同步）
@@ -95,7 +96,10 @@ export const DietProvider = ({ children }: { children: ReactNode }) => {
     });
 
     // 監聽背景同步：若 API 拉到比本機更新的資料，自動套用
-    const unsubscribe = storage.onUpdate(applyData);
+    const unsubscribe = storage.onUpdate((updatedData) => {
+      console.log('[Store] 後台 API 同步，更新資料:', updatedData);
+      applyData(updatedData);
+    });
     return unsubscribe;
   }, []);
 
@@ -127,13 +131,16 @@ export const DietProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (isLoading) return;
 
-    storage.save({
+    const dataToSave = {
       profile: userProfile,
       customTargets,
       dailyLogs,
       bodyLogs,
       customFoods
-    }).catch(err => console.error('[Store] 儲存失敗:', err));
+    };
+
+    console.log('[Store] 持久化資料到本機儲存...');
+    storage.save(dataToSave).catch(err => console.error('[Store] 儲存失敗:', err));
 
   }, [userProfile, customTargets, dailyLogs, bodyLogs, customFoods, isLoading]);
 

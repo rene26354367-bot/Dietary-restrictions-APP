@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { DietProvider, useDiet } from './lib/store';
 import ProfileSetup from './components/ProfileSetup';
@@ -6,7 +6,7 @@ import DailySummary from './components/DailySummary';
 import AddFood from './components/AddFood';
 import BodyStats from './components/BodyStats';
 import NutritionStats from './components/NutritionStats';
-import { Home, PlusCircle, User, Weight, BarChart3 } from 'lucide-react';
+import { Home, PlusCircle, User, Weight, BarChart3, Wifi, WifiOff } from 'lucide-react';
 import { cn } from './lib/utils';
 
 export default function App() {
@@ -21,12 +21,44 @@ export default function App() {
 
 function AppContent() {
   const { userProfile } = useDiet();
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('[App] 應用重新上線');
+      setIsOnline(true);
+    };
+    const handleOffline = () => {
+      console.log('[App] 應用已離線');
+      setIsOnline(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   if (!userProfile) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center sm:p-4">
-        <div className="w-full max-w-md bg-white min-h-screen sm:min-h-[800px] sm:max-h-[90vh] sm:rounded-3xl sm:shadow-2xl overflow-y-auto flex items-center justify-center p-4">
-          <ProfileSetup />
+        <div className="w-full max-w-md bg-white min-h-screen sm:min-h-[800px] sm:max-h-[90vh] sm:rounded-3xl sm:shadow-2xl overflow-y-auto flex flex-col p-4">
+          {!isOnline && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 mt-4 flex items-start gap-3">
+              <WifiOff className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-semibold text-amber-900 text-sm">離線模式</p>
+                <p className="text-xs text-amber-700 mt-1">
+                  暫無本機資料。請連接網路以設定個人資料。
+                </p>
+              </div>
+            </div>
+          )}
+          <div className="flex-1 flex items-center justify-center">
+            <ProfileSetup />
+          </div>
         </div>
       </div>
     );
@@ -35,6 +67,12 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-slate-100 flex justify-center items-start sm:items-center sm:p-4">
       <div className="w-full max-w-md bg-slate-50 min-h-screen sm:min-h-[800px] sm:max-h-[90vh] sm:rounded-3xl sm:shadow-2xl overflow-hidden relative flex flex-col">
+        {!isOnline && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center gap-2 text-xs font-medium text-amber-700">
+            <WifiOff className="w-4 h-4" />
+            離線模式 - 使用本機資料
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto pb-24 scroll-smooth">
           <Routes>
             <Route path="/" element={<div className="p-4"><DailySummary /></div>} />

@@ -3,6 +3,7 @@ import { useDiet } from '../lib/store';
 import { Search, ScanBarcode, ArrowLeft, CheckCircle2, BookmarkPlus, Camera, Loader2, AlertTriangle, Info } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE } from '../lib/storage/api';
 
 const MEAL_TYPES = [
   { id: 'breakfast', label: '早餐' },
@@ -64,7 +65,7 @@ function PresetSearch({ onAdd }: { onAdd: () => void }) {
   React.useEffect(() => {
     const timer = setTimeout(() => {
       setIsLoading(true);
-      fetch(`http://localhost:3001/api/search?q=${encodeURIComponent(search)}`)
+      fetch(`${API_BASE}/api/search?q=${encodeURIComponent(search)}`)
         .then(res => res.json())
         .then(data => {
           setResults(data);
@@ -276,7 +277,7 @@ function CustomLabel({ onAdd }: { onAdd: () => void }) {
     setIsParsing(true);
     setMetadata(null);
     try {
-      const res = await fetch('http://localhost:3001/api/ocr-parse', {
+      const res = await fetch(`${API_BASE}/api/ocr-parse`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text })
@@ -345,7 +346,7 @@ function CustomLabel({ onAdd }: { onAdd: () => void }) {
       // 6. 導出高品質 JPEG (0.85)
       const base64Image = canvas.toDataURL('image/jpeg', 0.85);
 
-      const res = await fetch('http://localhost:3001/api/ocr-scan', {
+      const res = await fetch(`${API_BASE}/api/ocr-scan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: base64Image })

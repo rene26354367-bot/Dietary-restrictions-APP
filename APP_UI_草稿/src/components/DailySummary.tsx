@@ -5,6 +5,7 @@ import 'react-circular-progressbar/dist/styles.css';
 import { Flame, Droplets, Wheat, Utensils, Info, Lightbulb, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { format, parseISO } from 'date-fns';
+import { API_BASE } from '../lib/storage/api';
 
 export default function DailySummary() {
   const { targets, dailyLogs, currentDate, setDate, removeEntry, updateEntry } = useDiet();
@@ -14,7 +15,7 @@ export default function DailySummary() {
 
   // 取得智慧建議
   useEffect(() => {
-    fetch(`http://localhost:3001/api/advice?date=${currentDate}`)
+    fetch(`${API_BASE}/api/advice?date=${currentDate}`)
       .then(res => res.json())
       .then(data => setAdvice(data))
       .catch(err => console.error("Failed to fetch advice", err));

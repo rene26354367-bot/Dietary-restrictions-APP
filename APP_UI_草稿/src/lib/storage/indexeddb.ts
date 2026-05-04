@@ -39,6 +39,16 @@ export const indexedDBBackend: StorageBackend = {
     try {
       const db = await getDB();
       const data = await db.get(STORE_NAME, KEY);
+      if (data) {
+        console.log('[IndexedDB] 載入成功，資料記錄數:', {
+          dailyLogsCount: Object.keys(data.dailyLogs).length,
+          bodyLogsCount: Object.keys(data.bodyLogs).length,
+          customFoodsCount: data.customFoods?.length || 0,
+          hasProfile: !!data.profile
+        });
+      } else {
+        console.log('[IndexedDB] 無資料（首次使用或已清空）');
+      }
       return data ?? null;
     } catch (e) {
       console.error('[IndexedDB] 載入失敗:', e);
@@ -47,8 +57,19 @@ export const indexedDBBackend: StorageBackend = {
   },
 
   async save(data: AllUserData): Promise<void> {
-    const db = await getDB();
-    await db.put(STORE_NAME, data, KEY);
+    try {
+      const db = await getDB();
+      await db.put(STORE_NAME, data, KEY);
+      console.log('[IndexedDB] 儲存成功，資料記錄數:', {
+        dailyLogsCount: Object.keys(data.dailyLogs).length,
+        bodyLogsCount: Object.keys(data.bodyLogs).length,
+        customFoodsCount: data.customFoods?.length || 0,
+        hasProfile: !!data.profile
+      });
+    } catch (e) {
+      console.error('[IndexedDB] 儲存失敗，這是嚴重錯誤！', e);
+      throw e; // 重新拋出以供 adapter 處理
+    }
   },
 
   async isAvailable(): Promise<boolean> {
