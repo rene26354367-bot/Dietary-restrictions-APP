@@ -9,108 +9,76 @@ const AppEngine = require('../AppEngine');
 const NutritionParser = require('../NutritionParser');
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
+
+// ── 多用戶 JSON 儲存 ──────────────────────────────────────────────────────────
+// DATA_DIR：Railway Volume 掛載路徑（生產）或專案根目錄（本地開發）
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..');
+
+// 確保目錄存在（Railway Volume 首次掛載時可能尚未建立）
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+console.log('[Server] DATA_DIR:', DATA_DIR);
+
+/** 安全化 uid：只允許英數字、底線、連字號，最多 30 字 */
+function getSafeUid(req) {
+  const uid = req.query.uid || req.headers['x-user-id'] || req.body?.uid || 'default';
+  return String(uid).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 30) || 'default';
+}
+
+function getUserDataPath(uid) {
+  return path.join(DATA_DIR, `user_data_${uid}.json`);
+}
+
+function loadUserData(uid) {
+  const file = getUserDataPath(uid);
+  try {
+    if (!fs.existsSync(file)) return null;
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (e) {
+    console.error(`[UserData] 讀取失敗 uid=${uid}:`, e.message);
+    return null;
+  }
+}
+
+/** Atomic write：先寫 .tmp 再 rename，避免 crash 時產生損壞的 JSON */
+function saveUserData(uid, data) {
+  const file = getUserDataPath(uid);
+  const tmp = file + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8');
+  fs.renameSync(tmp, file);
+  console.log(`[UserData] 已儲存 uid=${uid}`);
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 const engine = new AppEngine();
 
-app.use(cors());
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' })); // 增加限制以支援圖片上傳
 
-// 1. 取得使用者資料 (適配前端舊有的 store.tsx 格式)
+// 1. 取得使用者資料（per-uid，直接回傳 UI 格式 JSON）
 app.get('/api/user-data', (req, res) => {
-    // 轉換 dailyLogs 格式
-    const uiDailyLogs = {};
-    if (engine.dailyLogs) {
-        for (const date in engine.dailyLogs) {
-            uiDailyLogs[date] = {
-                date: date,
-                entries: (engine.dailyLogs[date] || []).map(log => ({
-                    id: log.logId || log.id,
-                    name: log.name,
-                    calories: log.nutrients.calories,
-                    protein: log.nutrients.protein,
-                    carbs: log.nutrients.carbohydrate,
-                    fat: log.nutrients.fat,
-                    amountEaten: log.weight,
-                    timestamp: new Date(log.timestamp).getTime(),
-                    mealType: log.mealType
-                }))
-            };
-        }
+    const uid = getSafeUid(req);
+    const data = loadUserData(uid);
+    if (!data) {
+        return res.json({ profile: null, dailyLogs: {}, bodyLogs: {}, customFoods: [], customTargets: null });
     }
-
-    // 轉換 bodyLogs 格式 (陣列轉物件)
-    const uiBodyLogs = {};
-    if (Array.isArray(engine.bodyLogs)) {
-        engine.bodyLogs.forEach(log => {
-            if (log.date) uiBodyLogs[log.date] = log;
-        });
-    }
-
-    // 檢查 Profile 是否完整，如果不完整則回傳 null 讓前端跳轉註冊
-    const hasProfile = engine.userProfile && engine.userProfile.gender && engine.userProfile.height;
-
-    res.json({
-        profile: hasProfile ? engine.userProfile : null,
-        dailyLogs: uiDailyLogs,
-        bodyLogs: uiBodyLogs,
-        customFoods: engine.customFoods || [],
-        targets: engine.dailyTarget
-    });
+    res.json(data);
 });
 
-// 2. 儲存使用者資料
+// 2. 儲存使用者資料（per-uid，直接儲存 UI 格式 JSON）
 app.post('/api/user-data', (req, res) => {
-    const data = req.body;
-    if (data.profile) engine.setUserProfile(data.profile);
-    
-    // 轉換 UI 格式回到後端規格
-    if (data.dailyLogs) {
-        const backendDailyLogs = {};
-        for (const date in data.dailyLogs) {
-            const dayData = data.dailyLogs[date];
-            
-            // 如果是 UI 格式 { date, entries: [] }
-            if (dayData && Array.isArray(dayData.entries)) {
-                backendDailyLogs[date] = dayData.entries.map(entry => ({
-                    logId: entry.id,
-                    name: entry.name,
-                    weight: entry.amountEaten,
-                    mealType: entry.mealType,
-                    timestamp: new Date(entry.timestamp).toISOString(),
-                    nutrients: {
-                        calories: entry.calories,
-                        protein: entry.protein,
-                        fat: entry.fat,
-                        carbohydrate: entry.carbs,
-                        sugar: entry.sugar || 0,
-                        sodium: entry.sodium || 0
-                    }
-                }));
-            } 
-            // 如果已經是後端格式 (陣列)
-            else if (Array.isArray(dayData)) {
-                backendDailyLogs[date] = dayData;
-            }
-        }
-        engine.dailyLogs = backendDailyLogs;
+    const uid = getSafeUid(req);
+    // 移除 uid 欄位後儲存（uid 是路由用途，不需存入資料）
+    const { uid: _uid, ...dataToStore } = req.body;
+    try {
+        saveUserData(uid, dataToStore);
+        res.json({ success: true });
+    } catch (e) {
+        console.error('[UserData] 儲存失敗:', e);
+        res.status(500).json({ error: '儲存失敗' });
     }
-
-    if (data.bodyLogs) {
-        // UI 是物件，後端是陣列
-        if (typeof data.bodyLogs === 'object' && !Array.isArray(data.bodyLogs)) {
-            engine.bodyLogs = Object.values(data.bodyLogs);
-        } else {
-            engine.bodyLogs = data.bodyLogs;
-        }
-    }
-
-    if (data.customFoods) engine.setCustomFoods(data.customFoods);
-    
-    // engine.saveData() 已包含在 setCustomFoods 中，但如果是 profile 或 logs 變動仍需呼叫
-    if (data.profile || data.dailyLogs || data.bodyLogs) {
-        engine.saveData();
-    }
-    res.json({ success: true, targets: engine.dailyTarget });
 });
 
 // 3. 搜尋食材 API
@@ -259,6 +227,6 @@ app.post('/api/ocr-scan', async (req, res) => {
 
 
 app.listen(PORT, () => {
-    console.log(`Backend API Server running at http://localhost:${PORT}`);
+    console.log(`[Server] Backend API running on port ${PORT}`);
 });
 

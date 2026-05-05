@@ -26,10 +26,20 @@ function getDB() {
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           db.createObjectStore(STORE_NAME);
         }
+      },
+      // 連線意外終止時（瀏覽器版本升級、強制關閉等），重置快取
+      terminated() {
+        console.warn('[IndexedDB] 連線被意外終止，下次使用時將重新連接');
+        dbPromise = null;
       }
     });
   }
   return dbPromise;
+}
+
+// 重置連線快取（連線進入 closing 狀態時使用）
+function resetDB() {
+  dbPromise = null;
 }
 
 export const indexedDBBackend: StorageBackend = {
@@ -57,18 +67,35 @@ export const indexedDBBackend: StorageBackend = {
   },
 
   async save(data: AllUserData): Promise<void> {
-    try {
+    const doSave = async () => {
       const db = await getDB();
       await db.put(STORE_NAME, data, KEY);
+    };
+
+    try {
+      await doSave();
       console.log('[IndexedDB] 儲存成功，資料記錄數:', {
         dailyLogsCount: Object.keys(data.dailyLogs).length,
         bodyLogsCount: Object.keys(data.bodyLogs).length,
         customFoodsCount: data.customFoods?.length || 0,
         hasProfile: !!data.profile
       });
-    } catch (e) {
-      console.error('[IndexedDB] 儲存失敗，這是嚴重錯誤！', e);
-      throw e; // 重新拋出以供 adapter 處理
+    } catch (e: any) {
+      // 連線已關閉（InvalidStateError）→ 重置並重試一次
+      if (e?.name === 'InvalidStateError' || e?.message?.includes('closing')) {
+        console.warn('[IndexedDB] 連線已關閉，重新連接並重試...');
+        resetDB();
+        try {
+          await doSave();
+          console.log('[IndexedDB] 重試儲存成功！');
+        } catch (e2) {
+          console.error('[IndexedDB] 重試儲存失敗！', e2);
+          throw e2;
+        }
+      } else {
+        console.error('[IndexedDB] 儲存失敗，這是嚴重錯誤！', e);
+        throw e;
+      }
     }
   },
 

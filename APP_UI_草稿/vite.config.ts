@@ -42,14 +42,11 @@ export default defineConfig(({mode}) => {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
           runtimeCaching: [
             {
-              // API 請求：網路優先，逾時 5 秒才 fallback 快取
+              // API 請求：不快取（NetworkOnly）
+              // 原因：per-uid 資料不應被 Service Worker cache，
+              // 否則不同設備/清快取後可能拿到舊資料
               urlPattern: /\/api\//,
-              handler: 'NetworkFirst',
-              options: {
-                cacheName: 'api-cache',
-                networkTimeoutSeconds: 5,
-                expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 }
-              }
+              handler: 'NetworkOnly'
             }
           ]
         }
