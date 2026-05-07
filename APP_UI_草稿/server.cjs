@@ -9,7 +9,17 @@ const AppEngine = require('../AppEngine');
 const NutritionParser = require('../NutritionParser');
 
 const app = express();
-const PORT = process.env.PORT || process.env.WEB_PORT || 3001;
+// 取得有效的 port 數字，過濾掉未解析的 ${WEB_PORT} 等字串
+function resolvePort() {
+  const candidates = [process.env.PORT, process.env.WEB_PORT, '8080'];
+  for (const c of candidates) {
+    if (!c) continue;
+    const n = parseInt(c, 10);
+    if (!isNaN(n) && n > 0 && n < 65536) return n;
+  }
+  return 8080;
+}
+const PORT = resolvePort();
 
 // ── 多用戶 JSON 儲存 ──────────────────────────────────────────────────────────
 // DATA_DIR：Railway Volume 掛載路徑（生產）或專案根目錄（本地開發）
