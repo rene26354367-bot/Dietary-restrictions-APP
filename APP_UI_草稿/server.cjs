@@ -57,6 +57,11 @@ const engine = new AppEngine();
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' })); // 增加限制以支援圖片上傳
 
+// 0. Health check（Zeabur 用來確認服務存活）
+app.get('/', (req, res) => {
+    res.json({ status: 'ok' });
+});
+
 // 1. 取得使用者資料（per-uid，直接回傳 UI 格式 JSON）
 app.get('/api/user-data', (req, res) => {
     const uid = getSafeUid(req);
