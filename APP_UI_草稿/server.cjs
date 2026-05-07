@@ -9,7 +9,7 @@ const AppEngine = require('../AppEngine');
 const NutritionParser = require('../NutritionParser');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || process.env.WEB_PORT || 3001;
 
 // ── 多用戶 JSON 儲存 ──────────────────────────────────────────────────────────
 // DATA_DIR：Railway Volume 掛載路徑（生產）或專案根目錄（本地開發）
