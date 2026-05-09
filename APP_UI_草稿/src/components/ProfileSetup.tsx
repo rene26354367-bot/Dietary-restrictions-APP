@@ -3,6 +3,10 @@ import { useDiet, CustomTargets } from '../lib/store';
 import { UserProfile, Gender, ActivityLevel } from '../lib/calculator';
 import { Activity, User, Ruler, Weight, Target, Save, RotateCcw, RefreshCw, Check } from 'lucide-react';
 
+// 由 vite.config.ts define 注入
+declare const __APP_VERSION__: string;
+declare const __BUILD_DATE__: string;
+
 export default function ProfileSetup() {
   const { userProfile, saveProfile, customTargets, saveCustomTargets, targets } = useDiet();
 
@@ -313,6 +317,16 @@ export default function ProfileSetup() {
             </p>
           )}
         </form>
+      </div>
+
+      {/* 版本號 */}
+      <div className="text-center py-4 space-y-1">
+        <p className="text-xs font-medium text-slate-400">
+          飲食營養追蹤 APP
+        </p>
+        <p className="text-[10px] text-slate-300 font-mono">
+          v{__APP_VERSION__} · Build {__BUILD_DATE__}
+        </p>
       </div>
     </div>
   );
