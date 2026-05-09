@@ -156,6 +156,18 @@ function PresetSearch({ onAdd }: { onAdd: () => void }) {
                     <span className="text-[11px] text-slate-500">脂 {typeof item.fat === 'number' ? item.fat.toFixed(1) : (parseFloat(item.fat) || 0).toFixed(1)}g</span>
                   </div>
                 </div>
+                {item.tags && item.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {item.tags.map((tag: string, i: number) => (
+                      <span
+                        key={i}
+                        className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </button>
           )) : search.length > 0 && !isLoading ? (

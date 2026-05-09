@@ -96,6 +96,48 @@ app.post('/api/user-data', (req, res) => {
     }
 });
 
+// 從 fullName 提取差異化標籤（用來區分名字相同的食材）
+// 範例 fullName："馬鈴薯(2022年取樣) (樣品狀態:生,黃皮種、 前處理描述:去皮,混合均勻打碎)"
+function extractTags(fullName, name) {
+    if (!fullName || fullName === name) return [];
+    const tags = [];
+    const seen = new Set();
+    const add = (t) => {
+        const tag = String(t || '').trim();
+        if (!tag || seen.has(tag)) return;
+        // 過濾無資訊量的通用詞
+        if (['混合均勻打碎', '混合均勻', '混合均勻磨碎', '打碎', '磨碎'].includes(tag)) return;
+        seen.add(tag);
+        tags.push(tag);
+    };
+
+    // 1. 從名稱緊接的括號提取（例如 馬鈴薯(2022年取樣) → 2022年取樣）
+    const nameStripped = fullName.replace(/\s*\(樣品狀態[\s\S]*$/, '').replace(/\s*\(前處理描述[\s\S]*$/, '');
+    const nameParen = nameStripped.match(/[(（]([^()（）]+)[)）]/);
+    if (nameParen && nameParen[1] && !/[:：]/.test(nameParen[1])) {
+        add(nameParen[1]);
+    }
+
+    // 2. 樣品狀態（如：生、熟、冷凍、紅皮種、黃皮種）
+    const sampleMatch = fullName.match(/樣品狀態[:：]([^、)）]+)/);
+    if (sampleMatch) {
+        sampleMatch[1].split(/[,，]/).forEach(add);
+    }
+
+    // 3. 前處理描述（如：去皮、帶皮、去籽、去殼）— 只取簡短關鍵字
+    const preMatch = fullName.match(/前處理描述[:：]([^、)）]+)/);
+    if (preMatch) {
+        preMatch[1].split(/[,，]/).forEach(t => {
+            const tag = t.trim();
+            // 只保留 4 個字以內的短語（去皮、帶皮、去籽等）
+            if (tag.length > 0 && tag.length <= 4) add(tag);
+        });
+    }
+
+    // 最多回傳 3 個最關鍵的標籤
+    return tags.slice(0, 3);
+}
+
 // 3. 搜尋食材 API
 app.get('/api/search', (req, res) => {
     const q = req.query.q;
@@ -103,7 +145,7 @@ app.get('/api/search', (req, res) => {
 
     console.log(`[Search] 正在搜尋: ${q}`);
     const results = engine.smartSearch(q);
-    
+
     // 轉換為前端 UI 預期的格式
     const uiResults = results.map(r => ({
         id: r.id,
@@ -118,7 +160,8 @@ app.get('/api/search', (req, res) => {
         source: r.source,
         verified: r.verified,
         matchedAlias: r.matchedAlias,
-        isFallback: r.isFallback
+        isFallback: r.isFallback,
+        tags: extractTags(r.fullName, r.name)
     }));
 
     res.json(uiResults);
