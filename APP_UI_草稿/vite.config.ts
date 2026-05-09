@@ -42,11 +42,36 @@ export default defineConfig(({mode}) => {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
           runtimeCaching: [
             {
+              // HTML / JS / CSS：優先網路，失敗才用快取
+              // 讓用戶刷新頁面就自動獲得最新版本，無需卸載重裝
+              urlPattern: /\.(html|js|css)$/,
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'app-shell',
+                expiration: {
+                  maxEntries: 10,
+                  maxAgeSeconds: 24 * 60 * 60 // 1 天過期
+                }
+              }
+            },
+            {
               // API 請求：不快取（NetworkOnly）
               // 原因：per-uid 資料不應被 Service Worker cache，
               // 否則不同設備/清快取後可能拿到舊資料
               urlPattern: /\/api\//,
               handler: 'NetworkOnly'
+            },
+            {
+              // 靜態資源（圖片、字體）：使用快取優先，網路失敗時用舊版
+              urlPattern: /\.(png|jpg|jpeg|svg|woff2|woff)$/,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'assets',
+                expiration: {
+                  maxEntries: 60,
+                  maxAgeSeconds: 30 * 24 * 60 * 60 // 30 天過期
+                }
+              }
             }
           ]
         }

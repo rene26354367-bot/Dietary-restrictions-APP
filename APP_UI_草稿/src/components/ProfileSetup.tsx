@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useDiet, CustomTargets } from '../lib/store';
 import { UserProfile, Gender, ActivityLevel } from '../lib/calculator';
-import { Activity, User, Ruler, Weight, Target, Save, RotateCcw } from 'lucide-react';
+import { Activity, User, Ruler, Weight, Target, Save, RotateCcw, RefreshCw, Check } from 'lucide-react';
 
 export default function ProfileSetup() {
   const { userProfile, saveProfile, customTargets, saveCustomTargets, targets } = useDiet();
@@ -22,6 +22,9 @@ export default function ProfileSetup() {
     carbs: 250,
     fat: 60
   });
+
+  // ── 更新檢查狀態 ─────────────────────────────────────────
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'updated'>('idle');
 
   // 當 customTargets 從 store 載入或更新時，同步到本地表單
   useEffect(() => {
@@ -50,6 +53,44 @@ export default function ProfileSetup() {
 
   const resetToAuto = () => {
     saveCustomTargets(null);
+  };
+
+  // 監聽 Service Worker 更新
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+
+    let refreshing = false;
+    const onControllerChange = () => {
+      if (refreshing) return;
+      refreshing = true;
+      setUpdateStatus('updated');
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+    };
+
+    navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+    return () => navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+  }, []);
+
+  // 手動檢查更新
+  const handleCheckUpdate = async () => {
+    setUpdateStatus('checking');
+    if ('serviceWorker' in navigator) {
+      try {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        registrations.forEach(reg => {
+          reg.update(); // 檢查 Service Worker 更新
+        });
+        // 延遲一下再設為 available，讓使用者有反應時間
+        setTimeout(() => {
+          setUpdateStatus('available');
+        }, 1000);
+      } catch (err) {
+        console.error('檢查更新失敗:', err);
+        setUpdateStatus('idle');
+      }
+    }
   };
 
   return (
@@ -144,6 +185,49 @@ export default function ProfileSetup() {
             儲存身體資訊
           </button>
         </form>
+      </div>
+
+      {/* 檢查更新區塊 */}
+      <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-2xl shadow-sm border border-blue-100">
+        <div className="flex items-start gap-3">
+          <div className="p-2 bg-blue-500 text-white rounded-lg shrink-0 mt-0.5">
+            <RefreshCw className="w-4 h-4" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-semibold text-blue-900 text-sm">更新管理</h3>
+            <p className="text-[11px] text-blue-700/80 mt-1">檢查應用是否有新版本。更新會自動安裝。</p>
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          {updateStatus === 'idle' && (
+            <button
+              onClick={handleCheckUpdate}
+              className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-sm"
+            >
+              檢查更新
+            </button>
+          )}
+          {updateStatus === 'checking' && (
+            <button disabled className="w-full py-2.5 px-4 bg-blue-400 text-white font-medium rounded-lg text-sm flex items-center justify-center gap-2">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              檢查中...
+            </button>
+          )}
+          {updateStatus === 'available' && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+              <div className="flex items-center gap-2 text-emerald-700 text-sm font-medium">
+                <Check className="w-4 h-4" />
+                已更新，即將重新載入...
+              </div>
+            </div>
+          )}
+          {updateStatus === 'updated' && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+              <p className="text-[11px] text-emerald-700">應用已更新！重新載入中...</p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 自定義目標區塊 */}
