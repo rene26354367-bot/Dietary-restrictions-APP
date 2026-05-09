@@ -66,7 +66,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-slate-100 flex justify-center items-start sm:items-center sm:p-4">
-      <div className="w-full max-w-md bg-slate-50 min-h-screen sm:min-h-[800px] sm:max-h-[90vh] sm:rounded-3xl sm:shadow-2xl overflow-hidden relative flex flex-col">
+      <div className="w-full max-w-md bg-slate-50 h-[100dvh] sm:h-auto sm:min-h-[800px] sm:max-h-[90vh] sm:rounded-3xl sm:shadow-2xl overflow-hidden relative flex flex-col">
         {!isOnline && (
           <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center gap-2 text-xs font-medium text-amber-700">
             <WifiOff className="w-4 h-4" />
