@@ -101,13 +101,31 @@ npm run dev
 
 ---
 
-## 📱 PWA 安裝教學（iPhone）
+## 📱 PWA 安裝教學
+
+### 🍎 iPhone（Safari）
 
 1. 用 **Safari** 打開 https://dietary-restrictions-app.vercel.app/
 2. 點擊下方 **分享按鈕**（方形加箭頭圖示）
 3. 選擇「**加入主畫面**」
 4. 點擊「新增」→ APP 圖示出現於桌面
 5. 之後直接從桌面開啟，擁有全螢幕 + 離線體驗
+
+### 🤖 Android（Chrome）
+
+1. 用 **Chrome** 打開 https://dietary-restrictions-app.vercel.app/
+2. 點擊右上角 **三點選單**（⋮）
+3. 選擇「**新增至主畫面**」或「**安裝應用程式**」
+4. 點擊「新增」→ APP 圖示出現於主畫面
+5. 之後直接從主畫面開啟，擁有全螢幕 + 離線體驗
+
+### 💻 電腦（Chrome / Edge）
+
+1. 用 **Chrome** 或 **Edge** 打開 https://dietary-restrictions-app.vercel.app/
+2. 點擊網址列右側的 **安裝圖示**（⊕ 或電腦圖示）
+   - 若未出現圖示，點擊瀏覽器右上角選單 → 選擇「**安裝飲食營養追蹤 APP**」
+3. 點擊「安裝」→ APP 會以獨立視窗開啟
+4. 之後可從桌面捷徑或應用程式選單啟動
 
 ---
 
