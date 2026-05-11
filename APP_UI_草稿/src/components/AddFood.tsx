@@ -1,9 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { useDiet } from '../lib/store';
-import { Search, ScanBarcode, ArrowLeft, CheckCircle2, BookmarkPlus, Camera, Loader2, AlertTriangle, Info } from 'lucide-react';
+import { Search, ScanBarcode, ArrowLeft, CheckCircle2, BookmarkPlus, Camera, Loader2, AlertTriangle, Info, ChevronLeft } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../lib/storage/api';
+
+type Category = { id: string; icon: string; label: string; count: number };
 
 const MEAL_TYPES = [
   { id: 'breakfast', label: '早餐' },
@@ -61,23 +63,58 @@ function PresetSearch({ onAdd }: { onAdd: () => void }) {
   const [mealType, setMealType] = useState<string>('breakfast');
   const [entryDate, setEntryDate] = useState<string>(currentDate);
 
-  // 異步搜尋邏輯
+  // 分類瀏覽狀態
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [activeCategory, setActiveCategory] = useState<Category | null>(null);
+
+  // 首次載入：取得分類清單
   React.useEffect(() => {
-    const timer = setTimeout(() => {
+    fetch(`${API_BASE}/api/categories`)
+      .then(res => res.json())
+      .then(data => Array.isArray(data) && setCategories(data))
+      .catch(err => console.warn('[Categories] 取得失敗:', err));
+  }, []);
+
+  // 搜尋 / 瀏覽分類邏輯
+  React.useEffect(() => {
+    // 搜尋有文字 → 走搜尋 API，並清除已選分類
+    if (search.trim()) {
+      if (activeCategory) setActiveCategory(null);
+      const timer = setTimeout(() => {
+        setIsLoading(true);
+        fetch(`${API_BASE}/api/search?q=${encodeURIComponent(search)}`)
+          .then(res => res.json())
+          .then(data => {
+            setResults(Array.isArray(data) ? data : []);
+            setIsLoading(false);
+          })
+          .catch(err => {
+            console.error('Search failed', err);
+            setIsLoading(false);
+          });
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+
+    // 搜尋為空 + 有選分類 → 走瀏覽 API
+    if (activeCategory) {
       setIsLoading(true);
-      fetch(`${API_BASE}/api/search?q=${encodeURIComponent(search)}`)
+      fetch(`${API_BASE}/api/browse?category=${activeCategory.id}&limit=200`)
         .then(res => res.json())
         .then(data => {
-          setResults(data);
+          setResults(Array.isArray(data?.items) ? data.items : []);
           setIsLoading(false);
         })
         .catch(err => {
-          console.error("Search failed", err);
+          console.error('Browse failed', err);
           setIsLoading(false);
         });
-    }, 300); // 300ms debounce
-    return () => clearTimeout(timer);
-  }, [search]);
+      return;
+    }
+
+    // 兩者都空 → 顯示分類網格（清空結果）
+    setResults([]);
+  }, [search, activeCategory]);
 
   const handleSave = () => {
     if (!selected) return;
@@ -116,9 +153,45 @@ function PresetSearch({ onAdd }: { onAdd: () => void }) {
         )}
       </div>
 
+      {/* 已選分類時顯示返回按鈕 */}
+      {!selected && activeCategory && !search.trim() && (
+        <div className="flex items-center justify-between px-1">
+          <button
+            onClick={() => setActiveCategory(null)}
+            className="flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            返回分類
+          </button>
+          <span className="text-xs text-slate-500">
+            <span className="mr-1">{activeCategory.icon}</span>
+            {activeCategory.label}（共 {activeCategory.count} 項）
+          </span>
+        </div>
+      )}
+
       {!selected ? (
         <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-          {results.length > 0 ? results.map(item => (
+          {/* 空白狀態 + 無選分類 → 顯示分類網格 */}
+          {!search.trim() && !activeCategory && categories.length > 0 ? (
+            <div className="p-3">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1">瀏覽分類</p>
+              <div className="grid grid-cols-3 gap-2">
+                {categories.map(cat => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setActiveCategory(cat)}
+                    disabled={cat.count === 0}
+                    className="flex flex-col items-center justify-center py-3 px-2 bg-slate-50 hover:bg-blue-50 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl transition-all border border-transparent hover:border-blue-200"
+                  >
+                    <span className="text-2xl mb-1">{cat.icon}</span>
+                    <span className="text-xs font-semibold text-slate-700">{cat.label}</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5">{cat.count} 項</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : results.length > 0 ? results.map(item => (
             <button
               key={item.id}
               onClick={() => { 

@@ -7,6 +7,7 @@ require('dotenv').config();
 // 引入核心引擎 (路徑回到上一層)
 const AppEngine = require('../AppEngine');
 const NutritionParser = require('../NutritionParser');
+const { searchFood } = require('../db_manager');
 
 const app = express();
 // 取得有效的 port 數字，過濾掉未解析的 ${WEB_PORT} 等字串
@@ -137,6 +138,114 @@ function extractTags(fullName, name) {
     // 最多回傳 3 個最關鍵的標籤
     return tags.slice(0, 3);
 }
+
+// ── 食材分類（v1.2 分類瀏覽） ─────────────────────────────────────────────────
+// 依優先順序匹配；前者命中即不繼續往下找
+// 設計原則：
+//   1. 只看 name 不看 fullName（fullName 描述可能含不相關詞）
+//   2. 加工食品最優先（冷凍魚捲不該歸海鮮）
+//   3. 蔬菜在海鮮前面（蚵仔白菜歸蔬菜）
+//   4. 結尾規則用於常見後綴（如「肉」、「米」、「魚」）
+const CATEGORIES = [
+    { id: 'processed', icon: '🥫', label: '加工食品',
+      keywords: ['冷凍', '罐頭', '即食', '麵腸', '魚捲', '魚丸', '貢丸', '香腸', '火腿', '培根', '臘肉', '泡麵', '速食', '熱狗', '肉鬆', '肉乾', '蜜餞', '果乾'] },
+    { id: 'beverage',  icon: '🧃', label: '飲料湯品',
+      keywords: ['果汁', '蔬果汁', '蔗汁', '啤酒', '可樂', '汽水', '豆漿', '米漿', '烏龍茶', '紅茶', '綠茶', '奶茶', '普洱', '鐵觀音', '咖啡', '可可飲', '碳酸飲', '運動飲', '雞精', '湯品', '滴雞精', '雞湯', '魚湯', '排骨湯', '高湯', '味噌湯', '濃湯'],
+      endsWith: ['汁', '茶', '咖啡', '酒'] },
+    { id: 'egg',       icon: '🥚', label: '蛋類',
+      keywords: ['蛋白', '蛋液', '蛋粉', '皮蛋', '鹹蛋', '茶葉蛋', '滷蛋'],
+      endsWith: ['蛋'] },
+    { id: 'dairy',     icon: '🥛', label: '乳製品',
+      keywords: ['鮮乳', '牛乳', '羊乳', '奶粉', '起司', '乳酪', '優格', '優酪乳', '酸乳', '煉乳', '鮮奶油', '冰淇淋', '奶昔', '低脂奶', '全脂奶', '脫脂奶'] },
+    { id: 'vegetable', icon: '🥬', label: '蔬菜',
+      keywords: ['白菜', '高麗菜', '花椰菜', '青菜', '菠菜', '芹菜', '韭菜', '蘿蔔', '茄子', '番茄', '蕃茄', '黃瓜', '苦瓜', '絲瓜', '南瓜', '冬瓜', '櫛瓜', '萵苣', '青椒', '甜椒', '馬鈴薯', '地瓜', '番薯', '甘藷', '芋頭', '山藥', '蓮藕', '茭白', '秋葵', '青花菜', '蘆筍', '蔥', '蒜', '薑', '香菜', '九層塔', '生菜', '蕪菁', '荷蘭豆', '甜豆', '豆芽', '豆苗', '木瓜', '油菜', '空心菜', '地瓜葉', '莧菜', '油麥菜', '小白菜', '大白菜', '結球白菜', '甘藍', '青江菜', '皇宮菜', '川七', '茼蒿', '芥菜', '芥藍', '羽衣甘藍', '雪裡紅', '酸菜', '蘿蔓', '紫高麗', '球萵苣', '美生菜', '玉米筍', '冬筍', '春筍', '麻竹筍', '綠竹筍', '蘆薈', '節瓜', '佛手瓜', '蛇瓜', '葫蘆', '檳榔心芋', '荸薺', '菱角', '豆薯', '淮山'],
+      endsWith: ['菜', '筍', '菇'] },
+    { id: 'fruit',     icon: '🍎', label: '水果',
+      keywords: ['蘋果', '香蕉', '葡萄', '柳橙', '柳丁', '橘子', '芒果', '鳳梨', '西瓜', '草莓', '藍莓', '酪梨', '荔枝', '龍眼', '芭樂', '蓮霧', '釋迦', '檸檬', '葡萄柚', '哈密瓜', '甜瓜', '蛋黃果', '桃子', '水蜜桃', '李子', '梅子', '櫻桃', '棗', '柿', '火龍果', '紅龍果', '奇異果', '百香果', '楊桃', '桑椹', '桑葚', '無花果', '榴槤', '山竹', '紅毛丹', '番石榴', '柚', '橙', '梨子', '甘蔗', '安石榴', '北蕉'],
+      endsWith: ['蕉'] },
+    { id: 'meat',      icon: '🥩', label: '肉類',
+      keywords: ['排骨', '里肌', '絞肉', '雞胸', '雞翅', '雞腿肉', '牛腩', '牛排', '雞胗', '雞肝', '鴨胸', '豬腳', '豬肝', '豬血', '豬皮', '牛筋', '雞肫', '梅花肉', '五花肉', '肩胛肉', '頰肉'],
+      endsWith: ['肉', '排', '胗', '肝', '腿', '翅'] },
+    { id: 'seafood',   icon: '🐟', label: '海鮮',
+      keywords: ['蝦', '蟹', '貝', '蛤', '蚵仔', '牡蠣', '烏賊', '章魚', '海帶', '紫菜', '海苔', '鮭', '鮪', '鯖', '鱈', '鰻', '鯛', '鮸', '鯧', '鱸', '小卷', '透抽', '干貝', '九孔', '鮑魚', '海參', '生蠔', '魷魚'],
+      endsWith: ['魚'] },
+    { id: 'grain',     icon: '🌾', label: '穀物',
+      keywords: ['麵粉', '麵條', '麵線', '麵包', '吐司', '饅頭', '燕麥', '薏仁', '小麥', '黑麥', '蕎麥', '玉米', '大麥', '高粱', '高梁', '藜麥', '台灣藜', '小米', '糯小米', '米粉', '稻', '秈米', '稉米', '糯米', '糙米', '白米', '越光米', '胚芽米', '米胚芽', '糯稻', '紅米', '黑米', '長米', '加鈣米', '高纖米', '五穀米'],
+      endsWith: ['米', '飯'] },
+    { id: 'bean',      icon: '🌰', label: '豆類堅果',
+      keywords: ['黃豆', '黑豆', '綠豆', '紅豆', '豌豆', '蠶豆', '鷹嘴豆', '毛豆', '豆腐', '豆乾', '豆皮', '納豆', '花豆', '皇帝豆', '米豆', '雲豆', '腰豆', '扁豆', '冬粉', '花生', '杏仁', '核桃', '腰果', '榛果', '夏威夷豆', '開心果', '松子', '栗子', '甘扁桃', '亞麻仁', '芡實', '蓮子', '南瓜籽', '葵花籽', '葵瓜子', '奇亞子', '銀杏'] },
+    { id: 'seasoning', icon: '🍶', label: '調味油料',
+      keywords: ['醬油', '沙拉油', '麻油', '橄欖油', '玉米油', '葵花油', '葡萄籽油', '茶油', '椰子油', '食用油', '芥花油', '苦茶油', '豬油', '雞油', '大豆油', '芝麻油', '醋', '辣椒醬', '胡椒', '咖哩', '味噌', '高湯粉', '雞粉', '蠔油', '蝦醬', '番茄醬', '美乃滋', '沙茶', '辣油', '蒜泥', '芝麻', '花生粉', '香料粉', '五香粉', '果糖', '砂糖', '冰糖', '蜂蜜', '糖漿'] },
+    { id: 'other',     icon: '🍱', label: '其他', keywords: [], endsWith: [] }
+];
+
+function categorize(name) {
+    const text = name || '';
+    for (const cat of CATEGORIES) {
+        if (cat.id === 'other') continue;
+        if (cat.keywords && cat.keywords.some(kw => text.includes(kw))) return cat.id;
+        if (cat.endsWith && cat.endsWith.some(suf => text.endsWith(suf))) return cat.id;
+    }
+    return 'other';
+}
+
+// 預計算所有食材的分類（啟動時跑一次）
+const ALL_FOODS = searchFood(''); // 空字串 → 回傳全資料庫
+const FOODS_BY_CATEGORY = {};
+CATEGORIES.forEach(cat => { FOODS_BY_CATEGORY[cat.id] = []; });
+ALL_FOODS.forEach(f => {
+    const catId = categorize(f.name);
+    FOODS_BY_CATEGORY[catId].push(f);
+});
+const CATEGORY_COUNTS = CATEGORIES.map(c => ({
+    id: c.id,
+    icon: c.icon,
+    label: c.label,
+    count: FOODS_BY_CATEGORY[c.id].length
+}));
+console.log('[Categorize] 分類完成:', CATEGORY_COUNTS.map(c => `${c.label}=${c.count}`).join(', '));
+
+// 將 DB 原始記錄轉成前端 UI 格式（與 /api/search 一致）
+function toUiFood(r) {
+    return {
+        id: r.id,
+        name: r.name,
+        brand: r.brand || '通用',
+        calories: r.nutrients ? (r.nutrients.calories * 100).toFixed(1) : (r.calories || 0).toFixed(1),
+        protein:  r.nutrients ? (r.nutrients.protein  * 100).toFixed(1) : (r.protein  || 0).toFixed(1),
+        carbs:    r.nutrients ? (r.nutrients.carbohydrate * 100).toFixed(1) : (r.carbs || 0).toFixed(1),
+        fat:      r.nutrients ? (r.nutrients.fat * 100).toFixed(1) : (r.fat || 0).toFixed(1),
+        sugar:    r.nutrients ? (r.nutrients.sugar * 100).toFixed(1) : (r.sugar || 0).toFixed(1),
+        sodium:   r.nutrients ? (r.nutrients.sodium * 100).toFixed(1) : (r.sodium || 0).toFixed(1),
+        source: r.source,
+        verified: r.verified,
+        tags: extractTags(r.fullName, r.name)
+    };
+}
+
+// 取得分類清單與每類筆數
+app.get('/api/categories', (req, res) => {
+    res.json(CATEGORY_COUNTS);
+});
+
+// 瀏覽某分類食材（支援分頁）
+app.get('/api/browse', (req, res) => {
+    const category = String(req.query.category || '').replace(/[^a-z]/g, '');
+    const limit  = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+
+    const list = FOODS_BY_CATEGORY[category];
+    if (!list) return res.status(400).json({ error: 'Unknown category' });
+
+    const page = list.slice(offset, offset + limit).map(toUiFood);
+    res.json({
+        category,
+        total: list.length,
+        offset,
+        limit,
+        items: page
+    });
+});
 
 // 3. 搜尋食材 API
 app.get('/api/search', (req, res) => {
