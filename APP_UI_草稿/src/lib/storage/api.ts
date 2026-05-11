@@ -40,6 +40,30 @@ function getUserId(): string {
 export const API_BASE = detectAPIBase();
 export const USER_ID = getUserId();
 
+/**
+ * 切換到另一個 UID（用於跨設備同步）
+ * - 寫入 localStorage 後重新載入頁面，讓 store / IndexedDB 用新 UID 重新初始化
+ * - 對 UID 做與後端一致的清洗，避免非法字元
+ */
+export function switchUserId(newUid: string): void {
+  if (typeof window === 'undefined') return;
+  const cleaned = newUid.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 30);
+  if (!cleaned) return;
+  localStorage.setItem('_uid', cleaned);
+  // 清除 URL 上的 ?uid= 參數（避免覆蓋 localStorage）
+  const url = new URL(window.location.href);
+  url.searchParams.delete('uid');
+  window.location.replace(url.toString());
+}
+
+/** 產生包含同步碼的分享連結 */
+export function buildSyncLink(uid: string = USER_ID): string {
+  if (typeof window === 'undefined') return '';
+  const url = new URL(window.location.origin);
+  url.searchParams.set('uid', uid);
+  return url.toString();
+}
+
 const DEFAULT_TIMEOUT_MS = 5000;
 
 /** fetch with timeout — 避免 API 掛掉時卡住整個 APP */

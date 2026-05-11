@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useDiet, CustomTargets } from '../lib/store';
 import { UserProfile, Gender, ActivityLevel } from '../lib/calculator';
-import { Activity, User, Ruler, Weight, Target, Save, RotateCcw, RefreshCw, Check } from 'lucide-react';
+import { Activity, User, Ruler, Weight, Target, Save, RotateCcw, RefreshCw, Check, Link2, Copy, ArrowRightLeft } from 'lucide-react';
+import { USER_ID, switchUserId, buildSyncLink } from '../lib/storage/api';
 
 // 由 vite.config.ts define 注入
 declare const __APP_VERSION__: string;
@@ -29,6 +30,46 @@ export default function ProfileSetup() {
 
   // ── 更新檢查狀態 ─────────────────────────────────────────
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'updated'>('idle');
+
+  // ── 資料同步狀態 ─────────────────────────────────────────
+  const [syncInput, setSyncInput] = useState('');
+  const [copiedField, setCopiedField] = useState<'code' | 'link' | null>(null);
+
+  const handleCopy = async (text: string, field: 'code' | 'link') => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2000);
+    } catch {
+      // 部分舊瀏覽器不支援 clipboard API，使用 fallback
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch {}
+      document.body.removeChild(ta);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2000);
+    }
+  };
+
+  const handleSwitchUid = () => {
+    const cleaned = syncInput.trim().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 30);
+    if (!cleaned) {
+      alert('請輸入有效的同步碼（只允許英數字、底線、連字號）');
+      return;
+    }
+    if (cleaned === USER_ID) {
+      alert('這已經是目前的同步碼了');
+      return;
+    }
+    const confirmed = window.confirm(
+      `確定切換到同步碼「${cleaned}」？\n\n目前的同步碼是「${USER_ID}」。切換後當前資料會保留在雲端，但要切回原本同步碼才能再次看到。`
+    );
+    if (confirmed) switchUserId(cleaned);
+  };
 
   // 當 customTargets 從 store 載入或更新時，同步到本地表單
   useEffect(() => {
@@ -231,6 +272,89 @@ export default function ProfileSetup() {
               <p className="text-[11px] text-emerald-700">應用已更新！重新載入中...</p>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* 資料同步區塊 */}
+      <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100/50 rounded-2xl shadow-sm border border-purple-100">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="p-2 bg-purple-500 text-white rounded-lg shrink-0 mt-0.5">
+            <Link2 className="w-4 h-4" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-semibold text-purple-900 text-sm">資料同步</h3>
+            <p className="text-[11px] text-purple-700/80 mt-1">用同步碼在多裝置共用同一份資料</p>
+          </div>
+        </div>
+
+        {/* 我的同步碼 */}
+        <div className="mb-4">
+          <label className="block text-[10px] font-bold text-purple-600 uppercase mb-1.5 ml-1">我的同步碼</label>
+          <div className="flex gap-2">
+            <div className="flex-1 px-4 py-2.5 bg-white border border-purple-200 rounded-lg font-mono text-sm font-bold text-purple-900 select-all">
+              {USER_ID}
+            </div>
+            <button
+              onClick={() => handleCopy(USER_ID, 'code')}
+              className="px-3 py-2.5 bg-white border border-purple-200 rounded-lg hover:bg-purple-50 transition-colors flex items-center justify-center min-w-[44px]"
+              title="複製同步碼"
+            >
+              {copiedField === 'code'
+                ? <Check className="w-4 h-4 text-emerald-600" />
+                : <Copy className="w-4 h-4 text-purple-600" />}
+            </button>
+          </div>
+        </div>
+
+        {/* 複製同步連結 */}
+        <button
+          onClick={() => handleCopy(buildSyncLink(), 'link')}
+          className="w-full py-2.5 px-4 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
+        >
+          {copiedField === 'link' ? (
+            <>
+              <Check className="w-4 h-4" />
+              已複製連結！
+            </>
+          ) : (
+            <>
+              <Copy className="w-4 h-4" />
+              複製同步連結
+            </>
+          )}
+        </button>
+
+        {/* 分隔線 */}
+        <div className="flex items-center gap-3 my-4">
+          <div className="flex-1 h-px bg-purple-200/60"></div>
+          <span className="text-[10px] text-purple-400 font-medium">或</span>
+          <div className="flex-1 h-px bg-purple-200/60"></div>
+        </div>
+
+        {/* 切換到其他同步碼 */}
+        <div>
+          <label className="block text-[10px] font-bold text-purple-600 uppercase mb-1.5 ml-1">切換到其他同步碼</label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={syncInput}
+              onChange={e => setSyncInput(e.target.value)}
+              placeholder="輸入對方的同步碼"
+              className="flex-1 px-4 py-2.5 bg-white border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:outline-none text-sm font-mono"
+              maxLength={30}
+            />
+            <button
+              onClick={handleSwitchUid}
+              disabled={!syncInput.trim()}
+              className="px-4 py-2.5 bg-slate-700 hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors text-sm flex items-center gap-1"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5" />
+              切換
+            </button>
+          </div>
+          <p className="text-[10px] text-purple-600/70 mt-2 ml-1">
+            ⚠️ 切換後當前資料會保留在雲端，但要切回原本同步碼才能再看到
+          </p>
         </div>
       </div>
 
