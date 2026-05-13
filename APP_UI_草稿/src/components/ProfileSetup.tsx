@@ -232,47 +232,89 @@ export default function ProfileSetup() {
         </form>
       </div>
 
-      {/* 檢查更新區塊 */}
-      <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-2xl shadow-sm border border-blue-100">
-        <div className="flex items-start gap-3">
-          <div className="p-2 bg-blue-500 text-white rounded-lg shrink-0 mt-0.5">
-            <RefreshCw className="w-4 h-4" />
+      {/* 自定義目標區塊 */}
+      <div className="p-6 bg-white rounded-2xl shadow-sm border border-slate-100">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-rose-50 text-rose-600 rounded-xl">
+              <Target className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-slate-800">自定義目標</h2>
+              <p className="text-sm text-slate-500">覆蓋自動計算的營養指標</p>
+            </div>
           </div>
-          <div className="flex-1">
-            <h3 className="font-semibold text-blue-900 text-sm">更新管理</h3>
-            <p className="text-[11px] text-blue-700/80 mt-1">檢查應用是否有新版本。更新會自動安裝。</p>
-          </div>
+          {customTargets && (
+            <button
+              onClick={resetToAuto}
+              className="p-2 text-slate-400 hover:text-blue-500 transition-colors"
+              title="恢復為自動計算"
+            >
+              <RotateCcw className="w-5 h-5" />
+            </button>
+          )}
         </div>
 
-        <div className="mt-4 space-y-2">
-          {updateStatus === 'idle' && (
-            <button
-              onClick={handleCheckUpdate}
-              className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-sm"
-            >
-              檢查更新
-            </button>
-          )}
-          {updateStatus === 'checking' && (
-            <button disabled className="w-full py-2.5 px-4 bg-blue-400 text-white font-medium rounded-lg text-sm flex items-center justify-center gap-2">
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              檢查中...
-            </button>
-          )}
-          {updateStatus === 'available' && (
-            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-              <div className="flex items-center gap-2 text-emerald-700 text-sm font-medium">
-                <Check className="w-4 h-4" />
-                已更新，即將重新載入...
-              </div>
+        <form onSubmit={handleCustomSubmit} className="space-y-5">
+          <div className="p-4 bg-rose-50/30 rounded-2xl border border-rose-100 mb-2">
+            <label className="block text-[10px] font-black text-rose-400 uppercase mb-2 ml-1 tracking-widest">目標每日熱量 (kcal)</label>
+            <input
+              type="number"
+              value={customForm.calories}
+              onChange={e => setCustomForm({ ...customForm, calories: Number(e.target.value) })}
+              className="w-full bg-transparent text-3xl font-black text-rose-600 outline-none placeholder:text-rose-200"
+              placeholder="2000"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1">碳水 (g)</label>
+              <input
+                type="number"
+                value={customForm.carbs}
+                onChange={e => setCustomForm({ ...customForm, carbs: Number(e.target.value) })}
+                className="w-full bg-transparent font-bold text-slate-700 outline-none text-base"
+                required
+              />
             </div>
-          )}
-          {updateStatus === 'updated' && (
-            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-              <p className="text-[11px] text-emerald-700">應用已更新！重新載入中...</p>
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1">蛋白 (g)</label>
+              <input
+                type="number"
+                value={customForm.protein}
+                onChange={e => setCustomForm({ ...customForm, protein: Number(e.target.value) })}
+                className="w-full bg-transparent font-bold text-slate-700 outline-none text-base"
+                required
+              />
             </div>
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1">脂肪 (g)</label>
+              <input
+                type="number"
+                value={customForm.fat}
+                onChange={e => setCustomForm({ ...customForm, fat: Number(e.target.value) })}
+                className="w-full bg-transparent font-bold text-slate-700 outline-none text-base"
+                required
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="w-full py-4 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl transition-all shadow-lg shadow-slate-200 active:scale-95 flex items-center justify-center gap-2"
+          >
+            <Save className="w-4 h-4" />
+            儲存自定義目標
+          </button>
+
+          {customTargets && (
+            <p className="text-[10px] text-center text-emerald-500 font-bold animate-in fade-in">
+              ✓ 目前正套用您的自定義飲食目標
+            </p>
           )}
-        </div>
+        </form>
       </div>
 
       {/* 資料同步區塊 */}
@@ -358,89 +400,47 @@ export default function ProfileSetup() {
         </div>
       </div>
 
-      {/* 自定義目標區塊 */}
-      <div className="p-6 bg-white rounded-2xl shadow-sm border border-slate-100">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-rose-50 text-rose-600 rounded-xl">
-              <Target className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold text-slate-800">自定義目標</h2>
-              <p className="text-sm text-slate-500">覆蓋自動計算的營養指標</p>
-            </div>
+      {/* 檢查更新區塊 */}
+      <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-2xl shadow-sm border border-blue-100">
+        <div className="flex items-start gap-3">
+          <div className="p-2 bg-blue-500 text-white rounded-lg shrink-0 mt-0.5">
+            <RefreshCw className="w-4 h-4" />
           </div>
-          {customTargets && (
-            <button 
-              onClick={resetToAuto}
-              className="p-2 text-slate-400 hover:text-blue-500 transition-colors"
-              title="恢復為自動計算"
-            >
-              <RotateCcw className="w-5 h-5" />
-            </button>
-          )}
+          <div className="flex-1">
+            <h3 className="font-semibold text-blue-900 text-sm">更新管理</h3>
+            <p className="text-[11px] text-blue-700/80 mt-1">檢查應用是否有新版本。更新會自動安裝。</p>
+          </div>
         </div>
 
-        <form onSubmit={handleCustomSubmit} className="space-y-5">
-          <div className="p-4 bg-rose-50/30 rounded-2xl border border-rose-100 mb-2">
-            <label className="block text-[10px] font-black text-rose-400 uppercase mb-2 ml-1 tracking-widest">目標每日熱量 (kcal)</label>
-            <input
-              type="number"
-              value={customForm.calories}
-              onChange={e => setCustomForm({ ...customForm, calories: Number(e.target.value) })}
-              className="w-full bg-transparent text-3xl font-black text-rose-600 outline-none placeholder:text-rose-200"
-              placeholder="2000"
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-3 gap-4">
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-              <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1">碳水 (g)</label>
-              <input
-                type="number"
-                value={customForm.carbs}
-                onChange={e => setCustomForm({ ...customForm, carbs: Number(e.target.value) })}
-                className="w-full bg-transparent font-bold text-slate-700 outline-none text-base"
-                required
-              />
-            </div>
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-              <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1">蛋白 (g)</label>
-              <input
-                type="number"
-                value={customForm.protein}
-                onChange={e => setCustomForm({ ...customForm, protein: Number(e.target.value) })}
-                className="w-full bg-transparent font-bold text-slate-700 outline-none text-base"
-                required
-              />
-            </div>
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-              <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1">脂肪 (g)</label>
-              <input
-                type="number"
-                value={customForm.fat}
-                onChange={e => setCustomForm({ ...customForm, fat: Number(e.target.value) })}
-                className="w-full bg-transparent font-bold text-slate-700 outline-none text-base"
-                required
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            className="w-full py-4 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl transition-all shadow-lg shadow-slate-200 active:scale-95 flex items-center justify-center gap-2"
-          >
-            <Save className="w-4 h-4" />
-            儲存自定義目標
-          </button>
-          
-          {customTargets && (
-            <p className="text-[10px] text-center text-emerald-500 font-bold animate-in fade-in">
-              ✓ 目前正套用您的自定義飲食目標
-            </p>
+        <div className="mt-4 space-y-2">
+          {updateStatus === 'idle' && (
+            <button
+              onClick={handleCheckUpdate}
+              className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-sm"
+            >
+              檢查更新
+            </button>
           )}
-        </form>
+          {updateStatus === 'checking' && (
+            <button disabled className="w-full py-2.5 px-4 bg-blue-400 text-white font-medium rounded-lg text-sm flex items-center justify-center gap-2">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              檢查中...
+            </button>
+          )}
+          {updateStatus === 'available' && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+              <div className="flex items-center gap-2 text-emerald-700 text-sm font-medium">
+                <Check className="w-4 h-4" />
+                已更新，即將重新載入...
+              </div>
+            </div>
+          )}
+          {updateStatus === 'updated' && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+              <p className="text-[11px] text-emerald-700">應用已更新！重新載入中...</p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 版本號 */}
