@@ -451,6 +451,14 @@ export default function ProfileSetup() {
         <p className="text-[10px] text-slate-300 font-mono">
           v{__APP_VERSION__} · Build {__BUILD_DATE__}
         </p>
+        <a
+          href="https://rene26354367-bot.github.io/Dietary-restrictions-APP/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[10px] text-blue-400/70 hover:text-blue-400 transition-colors"
+        >
+          關於此 APP
+        </a>
       </div>
     </div>
   );
