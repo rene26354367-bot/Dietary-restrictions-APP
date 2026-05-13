@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>飲食追蹤 APP — 免費 PWA 飲食營養記錄</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font-body); transition: background 0.5s, color 0.4s; }
+    :root {
+      --bg: #F8FAFF; --bg-alt: #FFFFFF; --bg-card: #FFFFFF;
+      --primary: #4361EE; --primary-dark: #2D4EDD; --primary-alpha: rgba(67,97,238,0.12);
+      --accent: #9B5DE5; --text: #0F172A; --text-muted: #64748B;
+      --border: #E2E8F0; --shadow: 0 4px 24px rgba(0,0,0,0.07);
+      --font-display: 'Sora', sans-serif; --font-body: 'Sora', sans-serif;
+      --hero-bg: radial-gradient(ellipse 80% 60% at 70% 40%, #EEF2FF 0%, #F8FAFF 70%);
+      --btn-text: #FFFFFF; --section-alt: #F1F5F9; --nav-bg: rgba(248,250,255,0.9);
+    }
+    @keyframes float    { 0%,100%{ transform:translateY(0) }    50%{ transform:translateY(-14px) } }
+    @keyframes blink    { 0%,100%{ opacity:1 }                  50%{ opacity:0.4 } }
+    @keyframes fadeUp   { from{ opacity:0; transform:translateY(20px) } to{ opacity:1; transform:translateY(0) } }
+    .f1 { animation: float 5s ease-in-out infinite; }
+    .f2 { animation: float 5s ease-in-out 1.2s infinite; }
+    .f3 { animation: float 5s ease-in-out 0.7s infinite; }
+    .bdot { animation: blink 2s ease-in-out infinite; }
+    ::-webkit-scrollbar { width:5px } ::-webkit-scrollbar-track { background:transparent }
+    ::-webkit-scrollbar-thumb { background:var(--primary); border-radius:3px }
+    @media(max-width:900px){
+      .hero-grid{ grid-template-columns:1fr !important }
+      .phone-col{ display:none !important }
+      .nav-links{ display:none !important }
+      .feat-grid,.rev-grid{ grid-template-columns:1fr 1fr !important }
+    }
+    @media(max-width:600px){
+      .feat-grid,.rev-grid{ grid-template-columns:1fr !important }
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "themeId": "aurora",
+  "lang": "zh"
+}/*EDITMODE-END*/;
+
+// ── THEMES ───────────────────────────────────────────────────────────────────
+const THEMES = {
+  aurora: {
+    id:'aurora', label:'清透 Aurora', icon:'🌊',
+    vars:{
+      '--bg':'#F8FAFF','--bg-alt':'#FFFFFF','--bg-card':'#FFFFFF',
+      '--primary':'#4361EE','--primary-dark':'#2D4EDD','--primary-alpha':'rgba(67,97,238,0.12)',
+      '--accent':'#9B5DE5','--text':'#0F172A','--text-muted':'#64748B',
+      '--border':'#E2E8F0','--shadow':'0 4px 24px rgba(0,0,0,0.07)',
+      '--font-display':"'Sora', sans-serif",'--font-body':"'Sora', sans-serif",
+      '--hero-bg':'radial-gradient(ellipse 80% 60% at 70% 40%, #EEF2FF 0%, #F8FAFF 70%)',
+      '--btn-text':'#FFFFFF','--section-alt':'#F1F5F9','--nav-bg':'rgba(248,250,255,0.9)',
+    },
+  },
+  energy: {
+    id:'energy', label:'暗夜 Energy', icon:'⚡',
+    vars:{
+      '--bg':'#0D1117','--bg-alt':'#161B25','--bg-card':'#1A2234',
+      '--primary':'#00E5A0','--primary-dark':'#00C887','--primary-alpha':'rgba(0,229,160,0.14)',
+      '--accent':'#FF6B6B','--text':'#F1F5F9','--text-muted':'#8B9EC5',
+      '--border':'#2D3B55','--shadow':'0 4px 24px rgba(0,0,0,0.35)',
+      '--font-display':"'Space Grotesk', sans-serif",'--font-body':"'Space Grotesk', sans-serif",
+      '--hero-bg':'radial-gradient(ellipse 80% 60% at 28% 50%, #0F2048 0%, #0D1117 70%)',
+      '--btn-text':'#0D1117','--section-alt':'#111827','--nav-bg':'rgba(13,17,23,0.92)',
+    },
+  },
+  nourish: {
+    id:'nourish', label:'暖食 Nourish', icon:'🌿',
+    vars:{
+      '--bg':'#FDF8F0','--bg-alt':'#FFFEF9','--bg-card':'#FFFFFF',
+      '--primary':'#2A7A4B','--primary-dark':'#1D5A37','--primary-alpha':'rgba(42,122,75,0.12)',
+      '--accent':'#D4622A','--text':'#1C1408','--text-muted':'#7C6554',
+      '--border':'#E8DDD0','--shadow':'0 4px 24px rgba(0,0,0,0.05)',
+      '--font-display':"'Lora', serif",'--font-body':"'DM Sans', sans-serif",
+      '--hero-bg':'radial-gradient(ellipse 80% 60% at 65% 40%, #EEE6D8 0%, #FDF8F0 70%)',
+      '--btn-text':'#FFFFFF','--section-alt':'#F5EEE4','--nav-bg':'rgba(253,248,240,0.92)',
+    },
+  },
+};
+
+// ── DATA ─────────────────────────────────────────────────────────────────────
+const FEATURES = [
+  { icon:'📊', zh:'每日營養追蹤',     en:'Daily Nutrition',
+    zhD:'熱量、蛋白質、碳水、脂肪，一覽無遺，輕鬆掌握每日攝取',
+    enD:'Calories, protein, carbs, fat, sugar & sodium — all tracked in one view' },
+  { icon:'🔍', zh:'2,000+ 食品資料庫', en:'Massive Food Database',
+    zhD:'涵蓋超商、餐廳、手搖飲、自煮食材，台灣在地 × FDA 認證雙資料庫',
+    enD:'Taiwan & FDA certified foods — 7-Eleven snacks to bubble tea covered' },
+  { icon:'📷', zh:'OCR 智慧掃描',     en:'Smart OCR Scanning',
+    zhD:'拍攝包裝營養標示，AI 自動辨識並填入所有數值，精準不費力',
+    enD:'Snap a nutrition label — AI auto-fills all values with sanity checks' },
+  { icon:'🤖', zh:'AI 個人化建議',    en:'AI-Powered Advice',
+    zhD:'Gemini AI 根據當日飲食記錄，即時給出熱量缺口、蛋白質補充等建議',
+    enD:'Gemini AI delivers real-time tips on calorie gaps and nutrient balance' },
+  { icon:'📱', zh:'PWA 離線安裝',     en:'PWA — No Download',
+    zhD:'無需 App Store，Safari 一鍵加入主畫面，離線也能查看所有記錄',
+    enD:'Skip the App Store — add to home screen, works fully offline too' },
+  { icon:'🎯', zh:'個人化目標設定',   en:'Personalized Goals',
+    zhD:'依身高、體重、年齡、運動強度自動計算 TDEE，也可完全手動覆蓋',
+    enD:'Auto-calculates TDEE & daily targets from your stats — or override manually' },
+];
+
+const CHANGELOG = [
+  { version:'v1.0.2', date:'2026-05-13', isLatest:true,
+    items:['食材資料庫分類功能上線','設備碼功能上線 — 跨設備同步使用紀錄','APP LOGO 正式上線'] },
+  { version:'v1.0.1', date:'2026-05-09', isLatest:false,
+    items:['更新版本號碼以及檢查更新功能','上下標題及功能選單上下固定高度','食材資料庫的差異化標籤更新'] },
+  { version:'v1.0.0', date:'2026-05-07',
+    items:['V1.0.0 飲食紀錄PWA軟體上線','每天記錄你的飲食，讓我們一起活得更健康','隨時監控自己的體態，讓我們變成自己想要的樣子'] },
+];
+
+const ROADMAP = [
+  { status:'next', label:'即將推出', labelEn:'Coming Soon', color:'var(--primary)',
+    items:['食材資料庫的分類項目','設置個別用戶的用戶號碼實現裝置移轉予同步使用'] },
+  { status:'planned', label:'規劃中', labelEn:'Planned', color:'var(--accent)',
+    items:['拓展食材資料庫含現行大廠加工食品','雙語系統介面(中文/英文)','更精準的營養攝取種類以及客製化營養建議'] },
+  { status:'idea', label:'探索中', labelEn:'Exploring', color:'var(--text-muted)',
+    items:['iOS / Android 原生 APP','掃描條碼直接查詢食品資訊','智慧辨識菜品營養'] },
+];
+
+// ── HOOK ──────────────────────────────────────────────────────────────────────
+function useTheme(themeId) {
+  useEffect(() => {
+    const t = THEMES[themeId];
+    if (!t) return;
+    Object.entries(t.vars).forEach(([k,v]) => document.documentElement.style.setProperty(k, v));
+  }, [themeId]);
+}
+
+// ── SHARED ────────────────────────────────────────────────────────────────────
+const pillSt = {
+  display:'inline-block', background:'var(--primary-alpha)', color:'var(--primary)',
+  padding:'5px 16px', borderRadius:100, fontSize:'0.72rem', fontWeight:700,
+  fontFamily:'var(--font-body)', letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:18,
+};
+const h2St = {
+  fontFamily:'var(--font-display)', fontWeight:800,
+  fontSize:'clamp(1.85rem, 3.5vw, 2.75rem)',
+  color:'var(--text)', letterSpacing:'-0.025em', lineHeight:1.12,
+};
+
+function Btn({ href, variant='primary', children, style={} }) {
+  const base = {
+    display:'inline-flex', alignItems:'center', gap:8,
+    padding:'14px 34px', borderRadius:100, textDecoration:'none',
+    fontSize:'0.975rem', fontWeight:700, fontFamily:'var(--font-body)',
+    transition:'transform 0.2s, box-shadow 0.2s, border-color 0.2s',
+  };
+  const prim = { background:'var(--primary)', color:'var(--btn-text)', boxShadow:'0 12px 32px var(--primary-alpha)' };
+  const sec  = { background:'var(--bg-card)', color:'var(--text)', border:'1px solid var(--border)' };
+  const s = { ...base, ...(variant === 'primary' ? prim : sec), ...style };
+  return (
+    <a href={href} target="_blank" rel="noopener" style={s}
+      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; if(variant==='primary') e.currentTarget.style.boxShadow='0 18px 44px var(--primary-alpha)'; else e.currentTarget.style.borderColor='var(--primary)'; }}
+      onMouseLeave={e => { e.currentTarget.style.transform = 'none'; if(variant==='primary') e.currentTarget.style.boxShadow='0 12px 32px var(--primary-alpha)'; else e.currentTarget.style.borderColor='var(--border)'; }}>
+      {children}
+    </a>
+  );
+}
+
+// ── NAV ───────────────────────────────────────────────────────────────────────
+function Nav({ lang, setLang }) {
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const fn = () => setScrolled(window.scrollY > 50);
+    window.addEventListener('scroll', fn);
+    return () => window.removeEventListener('scroll', fn);
+  }, []);
+  const items = lang === 'zh'
+    ? [['功能','#features'],['更新紀錄','#changelog'],['安裝教學','#install'],['未來規劃','#roadmap'],['聯絡我們','#contact']]
+    : [['Features','#features'],['Changelog','#changelog'],['Install','#install'],['Roadmap','#roadmap'],['Contact','#contact']];
+  return (
+    <nav style={{
+      position:'fixed', top:0, left:0, right:0, zIndex:1000,
+      height:64, display:'flex', alignItems:'center',
+      padding:'0 clamp(1rem,5vw,5rem)',
+      background: scrolled ? 'var(--nav-bg)' : 'transparent',
+      backdropFilter: scrolled ? 'blur(18px)' : 'none',
+      borderBottom: scrolled ? '1px solid var(--border)' : '1px solid transparent',
+      transition:'all 0.35s',
+    }}>
+      <div style={{display:'flex', alignItems:'center', gap:10, flex:1}}>
+        <div style={{width:36, height:36, borderRadius:10, overflow:'hidden', flexShrink:0}}>
+          <img src="uploads/logo.png" alt="logo" style={{width:'100%', height:'100%', objectFit:'cover'}}/>
+        </div>
+        <span style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:'1.02rem', color:'var(--text)', letterSpacing:'-0.01em'}}>
+          {lang === 'zh' ? '飲食追蹤' : 'NutriTrack'}
+        </span>
+      </div>
+      <div className="nav-links" style={{display:'flex', gap:28, alignItems:'center'}}>
+        {items.map(([label, href]) => (
+          <a key={label} href={href} style={{color:'var(--text-muted)', textDecoration:'none', fontSize:'0.875rem', fontFamily:'var(--font-body)', fontWeight:500, transition:'color 0.2s'}}
+            onMouseEnter={e => e.target.style.color='var(--primary)'}
+            onMouseLeave={e => e.target.style.color='var(--text-muted)'}>{label}</a>
+        ))}
+        <button onClick={() => setLang(l => l==='zh'?'en':'zh')} style={{
+          background:'var(--bg-card)', border:'1px solid var(--border)',
+          borderRadius:8, padding:'4px 13px', cursor:'pointer',
+          fontSize:'0.8rem', fontWeight:600, color:'var(--text-muted)', fontFamily:'var(--font-body)',
+          transition:'color 0.2s, border-color 0.2s',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.color='var(--primary)'; e.currentTarget.style.borderColor='var(--primary)'; }}
+        onMouseLeave={e => { e.currentTarget.style.color='var(--text-muted)'; e.currentTarget.style.borderColor='var(--border)'; }}>
+          {lang === 'zh' ? 'EN' : '中'}
+        </button>
+        <Btn href="https://dietary-restrictions-app.vercel.app/" style={{padding:'8px 22px', fontSize:'0.875rem'}}>
+          {lang === 'zh' ? '立即試用' : 'Try Free →'}
+        </Btn>
+      </div>
+    </nav>
+  );
+}
+
+// ── HERO ──────────────────────────────────────────────────────────────────────
+function Hero({ lang }) {
+  return (
+    <section style={{minHeight:'100vh', background:'var(--hero-bg)', display:'flex', alignItems:'center', padding:'80px clamp(1rem,5vw,5rem) 64px', overflow:'hidden'}}>
+      <div className="hero-grid" style={{maxWidth:1200, margin:'0 auto', width:'100%', display:'grid', gridTemplateColumns:'1fr auto', gap:'3.5rem', alignItems:'center'}}>
+        {/* Left: text */}
+        <div>
+          <div style={{display:'inline-flex', alignItems:'center', gap:8, background:'var(--primary-alpha)', borderRadius:100, padding:'6px 18px', marginBottom:28}}>
+            <span className="bdot" style={{width:7, height:7, borderRadius:'50%', background:'var(--primary)', display:'inline-block'}}></span>
+            <span style={{fontSize:'0.72rem', fontWeight:700, color:'var(--primary)', fontFamily:'var(--font-body)', letterSpacing:'0.06em', textTransform:'uppercase'}}>
+              {lang === 'zh' ? '免費 · PWA · 無需下載' : 'Free · PWA · No Download'}
+            </span>
+          </div>
+          <h1 style={{fontFamily:'var(--font-display)', fontWeight:800, fontSize:'clamp(2.8rem,5.5vw,4.6rem)', lineHeight:1.07, color:'var(--text)', letterSpacing:'-0.03em', marginBottom:24}}>
+            {lang === 'zh' ? <><span style={{color:'var(--primary)'}}>聰明追蹤</span><br/>每日飲食<br/>完全免費</> : <>Track Your<br/><span style={{color:'var(--primary)'}}>Diet</span><br/>For Free</>}
+          </h1>
+          <p style={{fontFamily:'var(--font-body)', fontSize:'1.1rem', color:'var(--text-muted)', lineHeight:1.78, maxWidth:480, marginBottom:42}}>
+            {lang === 'zh'
+              ? '2,000+ 食品資料庫 × OCR 包裝掃描 × Gemini AI 建議，輕鬆記錄每日飲食、管理體態，測試階段零訂閱費永久免費。'
+              : '7,000+ food DB × OCR scanning × Gemini AI coaching — track your diet and body, completely free forever.'}
+          </p>
+          <div style={{display:'flex', gap:14, flexWrap:'wrap', marginBottom:50}}>
+            <Btn href="https://dietary-restrictions-app.vercel.app/">
+              🚀 {lang === 'zh' ? '立即免費試用' : 'Start for Free'}
+            </Btn>
+            <a href="#features" style={{
+              display:'inline-flex', alignItems:'center', gap:8,
+              padding:'14px 34px', borderRadius:100, textDecoration:'none',
+              fontSize:'0.975rem', fontWeight:600, fontFamily:'var(--font-body)',
+              color:'var(--text)', border:'1px solid var(--border)', background:'var(--bg-card)',
+              transition:'border-color 0.2s, transform 0.2s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor='var(--primary)'; e.currentTarget.style.transform='translateY(-2px)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.transform='none'; }}>
+              {lang === 'zh' ? '了解功能 ↓' : 'See Features ↓'}
+            </a>
+          </div>
+          <div style={{display:'flex', gap:44}}>
+            {[['2,000+', lang==='zh'?'食品資料庫':'Food Items'],['v1.0.2', lang==='zh'?'最新版本':'Latest'],['100%', lang==='zh'?'免費使用':'Free Forever']].map(([v,l])=>(
+              <div key={l}>
+                <div style={{fontFamily:'var(--font-display)', fontWeight:800, fontSize:'1.45rem', color:'var(--primary)'}}>{v}</div>
+                <div style={{fontFamily:'var(--font-body)', fontSize:'0.78rem', color:'var(--text-muted)', marginTop:3}}>{l}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Right: phone mockup */}
+        <div className="phone-col" style={{position:'relative', display:'flex', alignItems:'center', paddingRight:96}}>
+          <div className="f1" style={{
+            width:256, height:534, borderRadius:44, border:'10px solid var(--text)',
+            overflow:'hidden', background:'var(--bg-card)', flexShrink:0, position:'relative',
+            boxShadow:'0 40px 80px rgba(0,0,0,0.22), 0 2px 0 var(--border)',
+          }}>
+            <div style={{position:'absolute', top:0, left:'50%', transform:'translateX(-50%)', width:88, height:24, background:'var(--text)', borderRadius:'0 0 14px 14px', zIndex:2}}></div>
+            <img src="uploads/screenshot.png" alt="App screenshot" style={{width:'100%', height:'100%', objectFit:'cover', objectPosition:'top center'}}/>
+          </div>
+          {/* Floating card — calories */}
+          <div className="f2" style={{position:'absolute', right:0, top:72, background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:16, padding:'13px 17px', minWidth:140, boxShadow:'var(--shadow)'}}>
+            <div style={{fontSize:'0.67rem', color:'var(--text-muted)', fontFamily:'var(--font-body)', marginBottom:4}}>今日熱量目標</div>
+            <div style={{fontFamily:'var(--font-display)', fontWeight:800, fontSize:'1.35rem', color:'var(--primary)'}}>2,040</div>
+            <div style={{fontSize:'0.64rem', color:'var(--text-muted)', fontFamily:'var(--font-body)'}}>kcal · 已達成 ✓</div>
+          </div>
+          {/* Floating card — OCR */}
+          <div className="f3" style={{position:'absolute', right:0, bottom:88, background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:16, padding:'12px 16px', minWidth:152, boxShadow:'var(--shadow)'}}>
+            <div style={{fontSize:'0.67rem', color:'var(--text-muted)', fontFamily:'var(--font-body)', marginBottom:8}}>OCR 掃描完成</div>
+            <div style={{display:'flex', alignItems:'center', gap:9}}>
+              <div style={{width:32, height:32, borderRadius:9, background:'var(--primary-alpha)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1rem', flexShrink:0}}>📷</div>
+              <div>
+                <div style={{fontFamily:'var(--font-body)', fontWeight:700, fontSize:'0.84rem', color:'var(--text)'}}>244.6 kcal</div>
+                <div style={{fontSize:'0.63rem', color:'var(--text-muted)', fontFamily:'var(--font-body)'}}>每100g 已驗證 ✓</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── FEATURES ──────────────────────────────────────────────────────────────────
+function Features({ lang }) {
+  return (
+    <section id="features" style={{padding:'clamp(64px,10vw,104px) clamp(1rem,5vw,5rem)', background:'var(--bg)'}}>
+      <div style={{maxWidth:1200, margin:'0 auto'}}>
+        <div style={{textAlign:'center', marginBottom:60}}>
+          <div style={pillSt}>{lang==='zh'?'功能特色':'Features'}</div>
+          <h2 style={h2St}>{lang==='zh'?'一個 APP，全面掌握飲食':'Everything You Need, for Free'}</h2>
+          <p style={{fontFamily:'var(--font-body)', color:'var(--text-muted)', fontSize:'1rem', maxWidth:520, margin:'14px auto 0', lineHeight:1.72}}>
+            {lang==='zh'?'從掃描到 AI 建議，涵蓋飲食追蹤的每一個環節，完全免費':'From OCR scanning to AI coaching — every feature included at zero cost'}
+          </p>
+        </div>
+        <div className="feat-grid" style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:20}}>
+          {FEATURES.map((f,i)=>(
+            <div key={i} style={{background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:20, padding:'26px 22px', transition:'transform 0.25s, box-shadow 0.25s, border-color 0.25s', cursor:'default'}}
+              onMouseEnter={e=>{ e.currentTarget.style.transform='translateY(-5px)'; e.currentTarget.style.boxShadow='0 18px 48px var(--primary-alpha)'; e.currentTarget.style.borderColor='var(--primary)'; }}
+              onMouseLeave={e=>{ e.currentTarget.style.transform='none'; e.currentTarget.style.boxShadow='none'; e.currentTarget.style.borderColor='var(--border)'; }}>
+              <div style={{width:50, height:50, borderRadius:14, background:'var(--primary-alpha)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.4rem', marginBottom:14}}>{f.icon}</div>
+              <h3 style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:'0.96rem', color:'var(--text)', marginBottom:8, letterSpacing:'-0.01em'}}>{lang==='zh'?f.zh:f.en}</h3>
+              <p style={{fontFamily:'var(--font-body)', fontSize:'0.865rem', color:'var(--text-muted)', lineHeight:1.68}}>{lang==='zh'?f.zhD:f.enD}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── CHANGELOG ─────────────────────────────────────────────────────────────────
+function Changelog({ lang }) {
+  const [open, setOpen] = useState('v1.0.2');
+  return (
+    <section id="changelog" style={{padding:'clamp(64px,10vw,104px) clamp(1rem,5vw,5rem)', background:'var(--section-alt)'}}>
+      <div style={{maxWidth:800, margin:'0 auto'}}>
+        <div style={{textAlign:'center', marginBottom:60}}>
+          <div style={pillSt}>{lang==='zh'?'版本更新':'Changelog'}</div>
+          <h2 style={h2St}>{lang==='zh'?'更新內容地圖':'Always Improving'}</h2>
+          <p style={{fontFamily:'var(--font-body)', color:'var(--text-muted)', fontSize:'1rem', maxWidth:460, margin:'14px auto 0', lineHeight:1.72}}>
+            {lang==='zh'?'每一個版本都在讓你知道我們還能更好':'Every release makes tracking smarter and more precise'}
+          </p>
+        </div>
+        <div style={{display:'flex', flexDirection:'column', gap:12}}>
+          {CHANGELOG.map(entry=>(
+            <div key={entry.version} style={{background:'var(--bg-card)', borderRadius:16, overflow:'hidden', border:'1px solid', borderColor:open===entry.version?'var(--primary)':'var(--border)', transition:'border-color 0.2s'}}>
+              <button onClick={()=>setOpen(open===entry.version?null:entry.version)} style={{width:'100%', padding:'18px 22px', display:'flex', alignItems:'center', gap:10, background:'none', border:'none', cursor:'pointer', textAlign:'left'}}>
+                <span style={{fontFamily:'var(--font-display)', fontWeight:800, fontSize:'1rem', color:'var(--text)', letterSpacing:'-0.01em'}}>{entry.version}</span>
+                {entry.isLatest&&<span style={{background:'var(--primary)', color:'var(--btn-text)', fontSize:'0.6rem', fontWeight:800, padding:'3px 10px', borderRadius:100, fontFamily:'var(--font-body)', letterSpacing:'0.05em'}}>LATEST</span>}
+                <span style={{flex:1, fontSize:'0.8rem', color:'var(--text-muted)', fontFamily:'var(--font-body)'}}>{entry.date}</span>
+                <span style={{color:'var(--text-muted)', fontSize:'1rem', transform:open===entry.version?'rotate(180deg)':'none', transition:'transform 0.25s', display:'inline-block'}}>▾</span>
+              </button>
+              {open===entry.version&&(
+                <div style={{padding:'0 22px 20px'}}>
+                  <div style={{borderTop:'1px solid var(--border)', paddingTop:14}}>
+                    <ul style={{listStyle:'none', display:'flex', flexDirection:'column', gap:9}}>
+                      {entry.items.map((item,i)=>(
+                        <li key={i} style={{display:'flex', gap:10, alignItems:'flex-start'}}>
+                          <span style={{color:'var(--primary)', fontWeight:700, flex:'0 0 auto', marginTop:2}}>✓</span>
+                          <span style={{fontFamily:'var(--font-body)', fontSize:'0.88rem', color:'var(--text)', lineHeight:1.65}}>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── INSTALL ─────────────────────────────────────────────────────────────────
+const INSTALL_STEPS = {
+  ios: {
+    icon: '🍎', zh: 'iPhone / iPad', en: 'iPhone / iPad',
+    steps: [
+      { zh: '用 Safari 開啟網站連結', en: 'Open the link in Safari' },
+      { zh: '點擊下方工具列的「分享」按鈕 □↑', en: 'Tap the Share button □↑ in the toolbar' },
+      { zh: '選擇「加入主畫面」', en: 'Tap "Add to Home Screen"' },
+      { zh: '點擊右上角「新增」完成！', en: 'Tap "Add" — done!' },
+    ],
+    note: { zh: '⚠️ 必須使用 Safari，Chrome 不支援安裝', en: '⚠️ Safari only — Chrome does not support PWA install on iOS' },
+  },
+  android: {
+    icon: '🤖', zh: 'Android 手機', en: 'Android',
+    steps: [
+      { zh: '用 Chrome 開啟網站連結', en: 'Open the link in Chrome' },
+      { zh: '點擊右上角「⋮」選單', en: 'Tap the ⋮ menu in the top right' },
+      { zh: '選擇「新增至主畫面」或「安裝應用程式」', en: 'Tap "Add to Home screen" or "Install app"' },
+      { zh: '確認安裝，圖示出現於桌面完成！', en: 'Confirm — the icon appears on your home screen!' },
+    ],
+    note: { zh: '✅ 支援 Chrome、Edge、Samsung Browser', en: '✅ Works with Chrome, Edge, Samsung Browser' },
+  },
+  desktop: {
+    icon: '💻', zh: '電腦（Windows / Mac）', en: 'Desktop (Windows / Mac)',
+    steps: [
+      { zh: '用 Chrome 或 Edge 開啟網站連結', en: 'Open the link in Chrome or Edge' },
+      { zh: '點擊網址列右側的安裝圖示 ⊕，或點右上角「⋮」選單', en: 'Click the install icon ⊕ in the address bar, or open ⋮ menu' },
+      { zh: '選擇「安裝飲食追蹤 APP」', en: 'Click "Install NutriTrack"' },
+      { zh: '完成！桌面與開始選單會出現獨立 APP 捷徑', en: 'Done! A standalone app shortcut appears on your desktop' },
+    ],
+    note: { zh: '✅ Chrome、Edge 皆支援，Firefox 暫不支援', en: '✅ Chrome & Edge supported; Firefox not yet' },
+  },
+};
+
+function Install({ lang }) {
+  const [active, setActive] = useState('ios');
+  const tabs = [['ios','🍎 iPhone'],['android','🤖 Android'],['desktop','💻 電腦']];
+  const cur = INSTALL_STEPS[active];
+  return (
+    <section id="install" style={{padding:'clamp(64px,10vw,104px) clamp(1rem,5vw,5rem)', background:'var(--section-alt)'}}>
+      <div style={{maxWidth:780, margin:'0 auto'}}>
+        <div style={{textAlign:'center', marginBottom:52}}>
+          <div style={pillSt}>{lang==='zh'?'安裝教學':'Installation'}</div>
+          <h2 style={h2St}>{lang==='zh'?'加入主畫面，隨時使用':'Add to Home Screen in Seconds'}</h2>
+          <p style={{fontFamily:'var(--font-body)', color:'var(--text-muted)', fontSize:'1rem', maxWidth:460, margin:'14px auto 0', lineHeight:1.72}}>
+            {lang==='zh'?'無需 App Store，免費安裝到任何裝置，擁有原生 APP 體驗':'No App Store needed — install free on any device for a native app feel'}
+          </p>
+        </div>
+        {/* Tab switcher */}
+        <div style={{display:'flex', gap:8, justifyContent:'center', marginBottom:32, flexWrap:'wrap'}}>
+          {tabs.map(([key, label]) => (
+            <button key={key} onClick={() => setActive(key)} style={{
+              padding:'10px 22px', borderRadius:100, border:'1px solid',
+              borderColor: active===key ? 'var(--primary)' : 'var(--border)',
+              background: active===key ? 'var(--primary-alpha)' : 'var(--bg-card)',
+              color: active===key ? 'var(--primary)' : 'var(--text-muted)',
+              fontFamily:'var(--font-body)', fontWeight:700, fontSize:'0.875rem',
+              cursor:'pointer', transition:'all 0.2s',
+            }}>{label}</button>
+          ))}
+        </div>
+        {/* Steps card */}
+        <div style={{background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:24, overflow:'hidden'}}>
+          <div style={{padding:'22px 28px 18px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', gap:12}}>
+            <span style={{fontSize:'1.6rem'}}>{cur.icon}</span>
+            <span style={{fontFamily:'var(--font-display)', fontWeight:800, fontSize:'1.05rem', color:'var(--text)'}}>
+              {lang==='zh' ? cur.zh : cur.en}
+            </span>
+          </div>
+          <div style={{padding:'26px 28px'}}>
+            <ol style={{listStyle:'none', display:'flex', flexDirection:'column', gap:16}}>
+              {cur.steps.map((step, i) => (
+                <li key={i} style={{display:'flex', alignItems:'flex-start', gap:14}}>
+                  <div style={{
+                    width:30, height:30, borderRadius:'50%', background:'var(--primary)', color:'var(--btn-text)',
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    fontFamily:'var(--font-display)', fontWeight:800, fontSize:'0.85rem', flexShrink:0,
+                  }}>{i+1}</div>
+                  <span style={{fontFamily:'var(--font-body)', fontSize:'0.96rem', color:'var(--text)', lineHeight:1.65, paddingTop:4}}>
+                    {lang==='zh' ? step.zh : step.en}
+                  </span>
+                </li>
+              ))}
+            </ol>
+            <div style={{marginTop:22, padding:'12px 16px', background:'var(--primary-alpha)', borderRadius:12}}>
+              <span style={{fontFamily:'var(--font-body)', fontSize:'0.85rem', color:'var(--text-muted)', lineHeight:1.6}}>
+                {lang==='zh' ? cur.note.zh : cur.note.en}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div style={{textAlign:'center', marginTop:36}}>
+          <Btn href="https://dietary-restrictions-app.vercel.app/">
+            🚀 {lang==='zh'?'立即開啟 APP':'Open the App'}
+          </Btn>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── ROADMAP ────────────────────────────────────────────────────────────────────
+function Roadmap({ lang }) {
+  return (
+    <section id="roadmap" style={{padding:'clamp(64px,10vw,104px) clamp(1rem,5vw,5rem)', background:'var(--bg)'}}>
+      <div style={{maxWidth:1100, margin:'0 auto'}}>
+        <div style={{textAlign:'center', marginBottom:60}}>
+          <div style={pillSt}>{lang==='zh'?'未來規劃':'Roadmap'}</div>
+          <h2 style={h2St}>{lang==='zh'?'我們正在打造什麼':'What We\'re Building Next'}</h2>
+          <p style={{fontFamily:'var(--font-body)', color:'var(--text-muted)', fontSize:'1rem', maxWidth:480, margin:'14px auto 0', lineHeight:1.72}}>
+            {lang==='zh'?'這份路線圖持續更新，歡迎透過 GitHub 提交你的需求！':'This roadmap evolves — open a GitHub issue to suggest features!'}
+          </p>
+        </div>
+        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:20}}>
+          {ROADMAP.map((col, ci) => (
+            <div key={ci} style={{background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:20, overflow:'hidden'}}>
+              <div style={{padding:'16px 22px 14px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', gap:10}}>
+                <span style={{width:10, height:10, borderRadius:'50%', background:col.color, display:'inline-block', flexShrink:0}}></span>
+                <span style={{fontFamily:'var(--font-display)', fontWeight:800, fontSize:'0.9rem', color:'var(--text)'}}>
+                  {lang==='zh' ? col.label : col.labelEn}
+                </span>
+              </div>
+              <ul style={{listStyle:'none', padding:'18px 22px', display:'flex', flexDirection:'column', gap:13}}>
+                {col.items.map((item, ii) => (
+                  <li key={ii} style={{display:'flex', gap:10, alignItems:'flex-start'}}>
+                    <span style={{color:col.color, fontWeight:700, flex:'0 0 auto', marginTop:'1px', fontSize:'1rem'}}>◦</span>
+                    <span style={{fontFamily:'var(--font-body)', fontSize:'0.9rem', color:'var(--text)', lineHeight:1.65}}>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── CONTACT ───────────────────────────────────────────────────────────────────
+function Contact({ lang }) {
+  return (
+    <section id="contact" style={{padding:'clamp(64px,10vw,104px) clamp(1rem,5vw,5rem)', background:'var(--section-alt)'}}>
+      <div style={{maxWidth:680, margin:'0 auto', textAlign:'center'}}>
+        <div style={pillSt}>{lang==='zh'?'聯絡我們':'Contact'}</div>
+        <h2 style={{...h2St, marginBottom:16}}>{lang==='zh'?'有問題或功能建議？':'Questions or Feature Requests?'}</h2>
+        <p style={{fontFamily:'var(--font-body)', color:'var(--text-muted)', fontSize:'1rem', lineHeight:1.78, marginBottom:44}}>
+          {lang==='zh'?'歡迎透過 GitHub 提交問題或功能需求，每一個回饋都讓這個 APP 變得更好！':'Open a GitHub issue for bugs or ideas — every piece of feedback makes the app better for everyone!'}
+        </p>
+        <div style={{display:'flex', gap:14, justifyContent:'center', flexWrap:'wrap'}}>
+          <Btn href="https://dietary-restrictions-app.vercel.app/">🚀 {lang==='zh'?'立即試用 APP':'Try the App'}</Btn>
+          <Btn href="https://github.com/rene26354367-bot/Dietary-restrictions-APP" variant="secondary">⭐ GitHub</Btn>
+          <Btn href="mailto:rene26354367@gmail.com" variant="secondary">✉ 聯繫Email</Btn>
+        </div>
+        <p style={{fontFamily:'var(--font-body)', fontSize:'0.8rem', color:'var(--text-muted)', marginTop:22}}>
+          rene26354367@gmail.com — 聯繫Email
+        </p>
+      </div>
+    </section>
+  );
+}
+
+// ── FOOTER ────────────────────────────────────────────────────────────────────
+function Footer({ lang }) {
+  return (
+    <footer style={{padding:'36px clamp(1rem,5vw,5rem)', borderTop:'1px solid var(--border)', background:'var(--bg)', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12}}>
+      <div style={{display:'flex', alignItems:'center', gap:9}}>
+        <div style={{width:28, height:28, borderRadius:8, overflow:'hidden', flexShrink:0}}>
+          <img src="uploads/logo.png" alt="logo" style={{width:'100%', height:'100%', objectFit:'cover'}}/>
+        </div>
+        <span style={{fontFamily:'var(--font-display)', fontWeight:700, fontSize:'0.9rem', color:'var(--text)'}}>{lang==='zh'?'飲食追蹤 APP':'NutriTrack'}</span>
+      </div>
+      <span style={{fontFamily:'var(--font-body)', fontSize:'0.8rem', color:'var(--text-muted)'}}>© 2026 · {lang==='zh'?'免費開源 · MIT License':'Open Source · MIT License'}</span>
+      <div style={{display:'flex', gap:20}}>
+        {[['GitHub','https://github.com/rene26354367-bot/Dietary-restrictions-APP'],[lang==='zh'?'試用 APP':'Try App','https://dietary-restrictions-app.vercel.app/']].map(([label,href])=>(
+          <a key={label} href={href} target="_blank" rel="noopener" style={{color:'var(--text-muted)', textDecoration:'none', fontSize:'0.8rem', fontFamily:'var(--font-body)', transition:'color 0.2s'}}
+            onMouseEnter={e=>e.target.style.color='var(--primary)'}
+            onMouseLeave={e=>e.target.style.color='var(--text-muted)'}>{label}</a>
+        ))}
+      </div>
+    </footer>
+  );
+}
+
+// ── TWEAKS PANEL ──────────────────────────────────────────────────────────────
+function TweaksPanel({ themeId, setThemeId, lang, setLang }) {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const fn = e => {
+      if (e.data?.type === '__activate_edit_mode') setShow(true);
+      if (e.data?.type === '__deactivate_edit_mode') setShow(false);
+    };
+    window.addEventListener('message', fn);
+    window.parent.postMessage({ type:'__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', fn);
+  }, []);
+  const pick = (key, val) => {
+    if (key === 'themeId') setThemeId(val);
+    if (key === 'lang') setLang(val);
+    window.parent.postMessage({ type:'__edit_mode_set_keys', edits:{ [key]:val } }, '*');
+  };
+  if (!show) return null;
+  return (
+    <div style={{position:'fixed', bottom:24, right:24, zIndex:9999, background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:20, padding:'22px 20px', width:268, boxShadow:'0 24px 64px rgba(0,0,0,0.18)'}}>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20}}>
+        <span style={{fontFamily:'var(--font-display)', fontWeight:800, fontSize:'0.95rem', color:'var(--text)'}}>Tweaks</span>
+        <button onClick={()=>{ setShow(false); window.parent.postMessage({type:'__edit_mode_dismissed'},'*'); }}
+          style={{background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', fontSize:'1.4rem', lineHeight:1}}>×</button>
+      </div>
+      <div style={{marginBottom:20}}>
+        <div style={{fontSize:'0.68rem', fontWeight:700, color:'var(--text-muted)', letterSpacing:'0.07em', textTransform:'uppercase', marginBottom:9, fontFamily:'var(--font-body)'}}>視覺主題</div>
+        <div style={{display:'flex', flexDirection:'column', gap:7}}>
+          {Object.values(THEMES).map(t=>(
+            <button key={t.id} onClick={()=>pick('themeId', t.id)} style={{
+              background:themeId===t.id?'var(--primary-alpha)':'transparent',
+              border:`1px solid ${themeId===t.id?'var(--primary)':'var(--border)'}`,
+              borderRadius:10, padding:'9px 12px', cursor:'pointer',
+              textAlign:'left', display:'flex', alignItems:'center', gap:9,
+              transition:'border-color 0.2s',
+            }}>
+              <span style={{fontSize:'1rem'}}>{t.icon}</span>
+              <span style={{fontFamily:'var(--font-body)', fontSize:'0.875rem', fontWeight:600, color:'var(--text)'}}>{t.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <div style={{fontSize:'0.68rem', fontWeight:700, color:'var(--text-muted)', letterSpacing:'0.07em', textTransform:'uppercase', marginBottom:9, fontFamily:'var(--font-body)'}}>語言</div>
+        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:7}}>
+          {[['zh','中文'],['en','English']].map(([code,label])=>(
+            <button key={code} onClick={()=>pick('lang', code)} style={{
+              background:lang===code?'var(--primary-alpha)':'transparent',
+              border:`1px solid ${lang===code?'var(--primary)':'var(--border)'}`,
+              borderRadius:10, padding:'9px 12px', cursor:'pointer',
+              fontFamily:'var(--font-body)', fontSize:'0.875rem', fontWeight:600, color:'var(--text)',
+              transition:'border-color 0.2s',
+            }}>{label}</button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── APP ───────────────────────────────────────────────────────────────────────
+function App() {
+  const [themeId, setThemeId] = useState(TWEAK_DEFAULTS.themeId || 'aurora');
+  const [lang, setLang] = useState(TWEAK_DEFAULTS.lang || 'zh');
+  useTheme(themeId);
+  return (
+    <div>
+      <Nav lang={lang} setLang={setLang} />
+      <Hero lang={lang} />
+      <Features lang={lang} />
+      <Changelog lang={lang} />
+      <Install lang={lang} />
+      <Roadmap lang={lang} />
+      <Contact lang={lang} />
+      <Footer lang={lang} />
+      <TweaksPanel themeId={themeId} setThemeId={setThemeId} lang={lang} setLang={setLang} />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
