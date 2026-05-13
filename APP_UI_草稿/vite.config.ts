@@ -15,7 +15,7 @@ export default defineConfig(({mode}) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['icons/*.png', 'favicon.ico'],
+        includeAssets: ['icons/icon-192.png', 'icons/icon-512.png', 'favicon.png'],
         manifest: {
           name: '飲食營養追蹤',
           short_name: '營養APP',
