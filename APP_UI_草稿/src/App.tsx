@@ -6,6 +6,7 @@ import DailySummary from './components/DailySummary';
 import AddFood from './components/AddFood';
 import BodyStats from './components/BodyStats';
 import NutritionStats from './components/NutritionStats';
+import AdminDashboard from './components/AdminDashboard';
 import { Home, PlusCircle, User, Weight, BarChart3, Wifi, WifiOff } from 'lucide-react';
 import { cn } from './lib/utils';
 
@@ -21,6 +22,7 @@ export default function App() {
 
 function AppContent() {
   const { userProfile } = useDiet();
+  const location = useLocation();
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
   useEffect(() => {
@@ -40,6 +42,15 @@ function AppContent() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  // 後台頁面：獨立呈現，不需個人資料、不顯示底部導覽列
+  if (location.pathname === '/admin') {
+    return (
+      <div className="min-h-screen bg-slate-100">
+        <AdminDashboard />
+      </div>
+    );
+  }
 
   if (!userProfile) {
     return (

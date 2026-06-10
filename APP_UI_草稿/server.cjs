@@ -97,6 +97,82 @@ app.post('/api/user-data', (req, res) => {
     }
 });
 
+// ── 後台統計（admin） ─────────────────────────────────────────────────────────
+// 需在環境變數設定 ADMIN_TOKEN 才會啟用；未設定時端點回 503
+function checkAdminToken(req, res) {
+    const expected = process.env.ADMIN_TOKEN;
+    if (!expected) {
+        res.status(503).json({ error: '後台未啟用（伺服器未設定 ADMIN_TOKEN）' });
+        return false;
+    }
+    const got = req.headers['x-admin-token'] || req.query.token;
+    if (got !== expected) {
+        res.status(401).json({ error: '無效的管理員密鑰' });
+        return false;
+    }
+    return true;
+}
+
+app.get('/api/admin/stats', (req, res) => {
+    if (!checkAdminToken(req, res)) return;
+
+    try {
+        const files = fs.readdirSync(DATA_DIR).filter(f => /^user_data_.+\.json$/.test(f));
+        const now = Date.now();
+        const DAY = 24 * 60 * 60 * 1000;
+
+        const users = files.map(file => {
+            const filePath = path.join(DATA_DIR, file);
+            const uid = file.replace(/^user_data_/, '').replace(/\.json$/, '');
+            const mtime = fs.statSync(filePath).mtime;
+
+            let daysLogged = 0, totalEntries = 0, bodyLogCount = 0, customFoodCount = 0, hasProfile = false;
+            try {
+                const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                const dailyLogs = data.dailyLogs || {};
+                for (const day of Object.values(dailyLogs)) {
+                    const entries = (day && day.entries) || [];
+                    if (entries.length > 0) daysLogged++;
+                    totalEntries += entries.length;
+                }
+                bodyLogCount = Object.keys(data.bodyLogs || {}).length;
+                customFoodCount = (data.customFoods || []).length;
+                hasProfile = !!data.profile;
+            } catch (e) {
+                console.error(`[Admin] 解析失敗 ${file}:`, e.message);
+            }
+
+            return {
+                uid,
+                daysLogged,
+                totalEntries,
+                bodyLogCount,
+                customFoodCount,
+                hasProfile,
+                lastActive: mtime.toISOString(),
+                daysSinceActive: Math.floor((now - mtime.getTime()) / DAY)
+            };
+        });
+
+        // 最近活躍排前面
+        users.sort((a, b) => new Date(b.lastActive) - new Date(a.lastActive));
+
+        res.json({
+            generatedAt: new Date().toISOString(),
+            totalUsers: users.length,
+            activeLast7Days: users.filter(u => u.daysSinceActive <= 7).length,
+            activeLast30Days: users.filter(u => u.daysSinceActive <= 30).length,
+            totalEntries: users.reduce((s, u) => s + u.totalEntries, 0),
+            totalDaysLogged: users.reduce((s, u) => s + u.daysLogged, 0),
+            users
+        });
+    } catch (e) {
+        console.error('[Admin] 統計失敗:', e);
+        res.status(500).json({ error: '統計失敗' });
+    }
+});
+// ─────────────────────────────────────────────────────────────────────────────
+
 // 從 fullName 提取差異化標籤（用來區分名字相同的食材）
 // 範例 fullName："馬鈴薯(2022年取樣) (樣品狀態:生,黃皮種、 前處理描述:去皮,混合均勻打碎)"
 function extractTags(fullName, name) {
